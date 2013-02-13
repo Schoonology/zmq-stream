@@ -1,0 +1,29 @@
+{
+  "name": "zmq-stream",
+  "version": "0.1.0",
+  "description": "A set of stream-based Node bindings for ZeroMQ.",
+  "main": "index.js",
+  "dependencies": {
+    "bindings": "~1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Schoonology/zmq-stream.git"
+  },
+  "keywords": [
+    "zeromq",
+    "zmq",
+    "ømq",
+    "streams2"
+  ],
+  "author": "Michael Schoonmaker <michael.r.schoonmaker@gmail.com>",
+  "license": "MIT",
+  "gypfile": true,
+  "readmeFilename": "README.md",
+  "gitHead": "fa69a9eb0d7caba2dc8a9030ea42427b6e357fe4"
+}
