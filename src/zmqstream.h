@@ -32,6 +32,8 @@ namespace zmqstream {
       virtual ~Socket();
 
     protected:
+      void *socket;
+
       Socket(int type);
 
       //
@@ -81,12 +83,41 @@ namespace zmqstream {
       //
       static v8::Handle<v8::Value> Write(const v8::Arguments& args);
 
-      // static v8::Handle<v8::Value> Connect(const v8::Arguments& args);
-      // static v8::Handle<v8::Value> Disconnect(const v8::Arguments& args);
-      // static v8::Handle<v8::Value> Bind(const v8::Arguments& args);
-      // static v8::Handle<v8::Value> Unbind(const v8::Arguments& args);
+      //
+      // ## Connect `Connect(endpoint)`
+      //
+      // Connects the ZMQ socket to **endpoint**, expressed as a String.
+      //
+      // Connect is synchronous, and will throw an Error upon failure.
+      //
+      static v8::Handle<v8::Value> Connect(const v8::Arguments& args);
 
-      void *socket;
+      //
+      // ## Disconnect `Disconnect(endpoint)`
+      //
+      // Disconnects the ZMQ socket from **endpoint**, expressed as a String.
+      //
+      // Disconnect is synchronous, and will throw an Error upon failure.
+      //
+      static v8::Handle<v8::Value> Disconnect(const v8::Arguments& args);
+
+      //
+      // ## Bind `Bind(endpoint)`
+      //
+      // Binds the ZMQ socket to **endpoint**, expressed as a String.
+      //
+      // Bind is synchronous, and will throw an Error upon failure.
+      //
+      static v8::Handle<v8::Value> Bind(const v8::Arguments& args);
+
+      //
+      // ## Unbind `Unbind(endpoint)`
+      //
+      // Unbinds the ZMQ socket from **endpoint**, expressed as a String.
+      //
+      // Unbind is synchronous, and will throw an Error upon failure.
+      //
+      static v8::Handle<v8::Value> Unbind(const v8::Arguments& args);
   };
 
   //

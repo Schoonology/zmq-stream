@@ -5,8 +5,6 @@
 
 #include "zmqstream.h"
 
-#define BROKER_URL "ipc:///tmp/zmqtestbr"
-
 using namespace v8;
 using namespace node;
 
@@ -29,7 +27,6 @@ namespace zmqstream {
     this->socket = zmq_socket(gContext.context, type);
 
     zmq_setsockopt(this->socket, ZMQ_IDENTITY, "TestClient", 10);
-    zmq_connect(this->socket, BROKER_URL);
   }
 
   Socket::~Socket() {
@@ -151,6 +148,82 @@ namespace zmqstream {
     return scope.Close(Boolean::New(1));
   }
 
+  Handle<Value> Socket::Connect(const Arguments& args) {
+    HandleScope scope;
+    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
+
+    if (self->socket == NULL) {
+      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be connected.")));
+    }
+
+    if (args.Length() != 1 || !args[0]->IsString()) {
+      return ThrowException(Exception::TypeError(String::New("No endpoint specified to connect to.")));
+    }
+
+    String::AsciiValue endpoint(args[0]->ToString());
+
+    zmq_connect(self->socket, *endpoint);
+
+    return scope.Close(Undefined());
+  }
+
+  Handle<Value> Socket::Disconnect(const Arguments& args) {
+    HandleScope scope;
+    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
+
+    if (self->socket == NULL) {
+      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be disconnected.")));
+    }
+
+    if (args.Length() != 1 || !args[0]->IsString()) {
+      return ThrowException(Exception::TypeError(String::New("No endpoint specified to disconnect from.")));
+    }
+
+    String::AsciiValue endpoint(args[0]->ToString());
+
+    zmq_disconnect(self->socket, *endpoint);
+
+    return scope.Close(Undefined());
+  }
+
+  Handle<Value> Socket::Bind(const Arguments& args) {
+    HandleScope scope;
+    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
+
+    if (self->socket == NULL) {
+      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be bound.")));
+    }
+
+    if (args.Length() != 1 || !args[0]->IsString()) {
+      return ThrowException(Exception::TypeError(String::New("No endpoint specified to bind to.")));
+    }
+
+    String::AsciiValue endpoint(args[0]->ToString());
+
+    zmq_bind(self->socket, *endpoint);
+
+    return scope.Close(Undefined());
+  }
+
+  Handle<Value> Socket::Unbind(const Arguments& args) {
+    HandleScope scope;
+    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
+
+    if (self->socket == NULL) {
+      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be unbound.")));
+    }
+
+    if (args.Length() != 1 || !args[0]->IsString()) {
+      return ThrowException(Exception::TypeError(String::New("No endpoint specified to unbind from.")));
+    }
+
+    String::AsciiValue endpoint(args[0]->ToString());
+
+    zmq_unbind(self->socket, *endpoint);
+
+    return scope.Close(Undefined());
+  }
+
   void Socket::Install(Handle<Object> target) {
     HandleScope scope;
 
@@ -164,6 +237,10 @@ namespace zmqstream {
     NODE_SET_PROTOTYPE_METHOD(constructor, "read", Read);
     NODE_SET_PROTOTYPE_METHOD(constructor, "write", Write);
     NODE_SET_PROTOTYPE_METHOD(constructor, "close", Close);
+    NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
+    NODE_SET_PROTOTYPE_METHOD(constructor, "disconnect", Disconnect);
+    NODE_SET_PROTOTYPE_METHOD(constructor, "bind", Bind);
+    NODE_SET_PROTOTYPE_METHOD(constructor, "unbind", Unbind);
 
     Local<Object> Type = Object::New();
     ZMQ_DEFINE_CONSTANT(Type, "REQ", ZMQ_REQ);
