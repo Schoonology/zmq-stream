@@ -26,7 +26,7 @@ namespace zmqstream {
   }
 
   ScopedContext::~ScopedContext() {
-    assert(zmq_ctx_destroy(context) == 0);
+    assert(zmq_ctx_destroy(context) == 0 || zmq_errno() == EINTR);
   }
 
   //
