@@ -90,7 +90,36 @@ namespace zmqstream {
       return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be read from.")));
     }
 
-    return scope.Close(Null());
+    int size = -1;
+
+    if (args.Length() > 0) {
+      size = args[0]->ToInteger()->Value();
+    }
+
+    if (size == 0) {
+      return scope.Close(Null());
+    }
+
+    zmq_msg_t part;
+    Handle<Object> frame;
+    Handle<Array> messages = Array::New();
+    Handle<Array> message = Array::New();
+
+    messages->Set(messages->Length(), message);
+
+    do {
+      zmq_msg_close(&part);
+      zmq_msg_init(&part);
+
+      if (zmq_msg_recv(&part, self->socket, ZMQ_DONTWAIT) == EAGAIN) {
+        return scope.Close(Null());
+      }
+
+      frame = Buffer::New(String::New((char*)zmq_msg_data(&part), zmq_msg_size(&part)));
+      message->Set(message->Length(), frame);
+    } while (zmq_msg_more(&part));
+
+    return scope.Close(messages);
   }
 
   //

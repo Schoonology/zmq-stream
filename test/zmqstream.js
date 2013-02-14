@@ -113,7 +113,7 @@ describe('ZMQStream', function () {
         self.socket = new zmqstream.Socket({
           type: zmqstream.Type.PAIR
         })
-        self.endpoint = 'ipc:///tmp/zmqstreamtest' + Math.random().toString().slice(2, 6)
+        self.endpoint = 'inproc:///tmp/zmqstreamtest' + Math.random().toString().slice(2, 6)
       })
 
       it('should be able to bind without error', function () {
@@ -140,10 +140,11 @@ describe('ZMQStream', function () {
         this.socket.read(1)
       })
 
+      // TODO: Multiple messages, not multiple frames.
       it('should be able to read the messages sent', function () {
         var a = new zmqstream.Socket()
           , b = new zmqstream.Socket()
-          , message = [new Buffer('test')]
+          , message = [new Buffer('one'), new Buffer('two')]
 
         a.bind(this.endpoint)
         b.connect(this.endpoint)
@@ -155,10 +156,13 @@ describe('ZMQStream', function () {
         expect(message).to.be.an.instanceof(Array)
         expect(message).to.have.length(1)
         expect(message[0]).to.be.an.instanceof(Array)
-        expect(message[0]).to.have.length(1)
+        expect(message[0]).to.have.length(2)
         expect(message[0][0]).to.be.an.instanceof(Buffer)
-        expect(message[0][0]).to.have.length(4)
-        expect(message[0][0].toString()).to.equal('test')
+        expect(message[0][0]).to.have.length(3)
+        expect(message[0][0].toString()).to.equal('one')
+        expect(message[0][1]).to.be.an.instanceof(Buffer)
+        expect(message[0][1]).to.have.length(3)
+        expect(message[0][1].toString()).to.equal('two')
       })
     })
 
