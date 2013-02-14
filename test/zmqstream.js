@@ -73,7 +73,7 @@ describe('ZMQStream', function () {
     })
 
     it('should construct an object be the correct type', function () {
-      var socket = Socket()
+      var socket = new Socket()
 
       expect(socket).to.exist
       expect(socket).to.be.an('object')
@@ -92,7 +92,7 @@ describe('ZMQStream', function () {
       beforeEach(function () {
         var self = this
 
-        self.socket = Socket()
+        self.socket = new Socket()
       })
 
       it('should be callable without error with 0 frames', function () {
@@ -108,7 +108,7 @@ describe('ZMQStream', function () {
       })
 
       it('should throw if the Socket is closed', function () {
-        var socket = Socket({
+        var socket = new Socket({
           type: zmqstream.Type.REQ
         })
 
@@ -134,15 +134,21 @@ describe('ZMQStream', function () {
       })
 
       it('should be callable without error with 0 frames', function () {
-        this.socket.read(0)
+        expect(
+          this.socket.read(0)
+        ).to.be.null
       })
 
       it('should be callable without error with 1 frame', function () {
-        this.socket.read(1)
+        expect(
+          this.socket.read(1)
+        ).to.be.null
       })
 
       it('should be callable without error with n frames', function () {
-        this.socket.read(3)
+        expect(
+          this.socket.read(3)
+        ).to.be.null
       })
 
       it('should receive the frames of a single message in order', function () {

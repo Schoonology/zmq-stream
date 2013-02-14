@@ -22,11 +22,11 @@ namespace zmqstream {
   //
   ScopedContext::ScopedContext() {
     context = zmq_ctx_new();
+    assert(context != 0);
   }
 
   ScopedContext::~ScopedContext() {
-    zmq_ctx_destroy(context);
-    printf("~Context\n");
+    assert(zmq_ctx_destroy(context) == 0);
   }
 
   //
@@ -79,10 +79,14 @@ namespace zmqstream {
     if (this->socket) {
       assert(zmq_close(this->socket) == 0);
     }
-
-    printf("~Socket\n");
   }
 
+
+  //
+  // ## Close `Close()`
+  //
+  // Closes the underlying ZMQ socket. _The stream should no longer be used!_
+  //
   Handle<Value> Socket::Close(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
@@ -99,6 +103,10 @@ namespace zmqstream {
     return scope.Close(Undefined());
   }
 
+  //
+  // ## Socket(options)
+  //
+  // Creates a new **options.type** ZMQ socket. Defaults to PAIR.
   //
   // TODO:
   //  * Handle highWaterMark and lowWaterMark options.
@@ -157,8 +165,6 @@ namespace zmqstream {
     Handle<Array> messages = Array::New();
     Handle<Array> message = Array::New();
 
-    messages->Set(messages->Length(), message);
-
     do {
       ZMQ_CHECK(zmq_msg_init(&part));
 
@@ -166,14 +172,23 @@ namespace zmqstream {
       ZMQ_CHECK(rc);
 
       if (!isEAGAIN(rc)) {
+        // We want to continue, so clear `rc`.
+        rc = 0;
+
         message->Set(message->Length(), Buffer::New(String::New((char*)zmq_msg_data(&part), zmq_msg_size(&part))));
 
-        // In this case, we actually want to flip `rc`, because an rc of 0 means there's no more.
-        rc = !zmq_msg_more(&part);
+        if (!zmq_msg_more(&part)) {
+          messages->Set(messages->Length(), message);
+          message = Array::New();
+        }
       }
 
       ZMQ_CHECK(zmq_msg_close(&part));
     } while (rc == 0);
+
+    if (messages->Length() == 0) {
+      return scope.Close(Null());
+    }
 
     return scope.Close(messages);
   }
@@ -186,14 +201,11 @@ namespace zmqstream {
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
     if (self->socket == NULL) {
-      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be written to.")));
+      THROW_REF("Socket is closed, and cannot be written to.");
     }
 
-    if (args.Length() != 1) {
-      return ThrowException(Exception::TypeError(String::New("Expected write([Buffer])")));
-    }
-    if (!args[0]->IsArray()) {
-      return ThrowException(Exception::TypeError(String::New("Expected write([Buffer])")));
+    if (args.Length() < 1 || !args[0]->IsArray()) {
+      THROW_TYPE("No message specified.");
     }
 
     Local<Object> frames = args[0]->ToObject();
@@ -203,7 +215,7 @@ namespace zmqstream {
 
     for (int i = 0; i < length; i++) {
       if (!Buffer::HasInstance(frames->Get(i))) {
-        return ThrowException(Exception::TypeError(String::New("Expected write([Buffer])")));
+        THROW_TYPE("Cannot write non-Buffer message part.");
       }
     }
 
