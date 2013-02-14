@@ -57,7 +57,7 @@ namespace zmqstream {
       // If there is no data to consume, or if there are fewer bytes in the internal buffer than the size argument,
       // then null is returned, and a future 'readable' event will be emitted when more is available.
       //
-      // Calling stream.read(0) is a no-op with no internal side effects.
+      // Calling stream.read(0) is a no-op with no internal side effects, but can be used to test for Socket validity.
       //
       // Returns an Array of Messages, which are in turn Arrays of Frames as Node Buffers.
       //
@@ -70,6 +70,9 @@ namespace zmqstream {
       // ## Write `Write(message)`
       //
       // Writes **message** to the ZMQ socket to be transmitted over the wire at some time in the future.
+      //
+      // Calling stream.write([]) is a no-op with no internal side effects, but can be used for test for Socket
+      // validity.
       //
       // Returns true if **message** was queued successfully, or false if the buffer is full (see ZMQ_DONTWAIT/EAGAIN).
       //

@@ -53,6 +53,10 @@ namespace zmqstream {
     return scope.Close(Undefined());
   }
 
+  //
+  // TODO:
+  //  * Handle highWaterMark and lowWaterMark options.
+  //
   Handle<Value> Socket::New(const Arguments& args) {
     HandleScope scope;
 
@@ -76,24 +80,13 @@ namespace zmqstream {
 
   Handle<Value> Socket::Read(const Arguments& args) {
     HandleScope scope;
+    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
-    //  Socket to talk to clients
-    void *socket = zmq_socket (gContext.context, ZMQ_DEALER);
-    zmq_setsockopt (socket, ZMQ_IDENTITY, "TestClient", 10);
-    zmq_connect (socket, BROKER_URL);
-
-    for (int i = 0; i < 1000; i++) {
-      zmq_send (socket, 0, 0, ZMQ_SNDMORE);
-      zmq_msg_t request;
-      zmq_msg_init_size (&request, 5);
-      memcpy (zmq_msg_data (&request), "Hello", 5);
-      zmq_msg_send (&request, socket, 0);
-      zmq_msg_close (&request);
+    if (self->socket == NULL) {
+      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be read from.")));
     }
 
-    zmq_close (socket);
-
-    return scope.Close(String::New("Done"));
+    return scope.Close(Null());
   }
 
   //
@@ -101,6 +94,11 @@ namespace zmqstream {
   //
   Handle<Value> Socket::Write(const Arguments& args) {
     HandleScope scope;
+    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
+
+    if (self->socket == NULL) {
+      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be written to.")));
+    }
 
     if (args.Length() != 1) {
       return ThrowException(Exception::TypeError(String::New("Expected write([Buffer])")));
@@ -110,7 +108,6 @@ namespace zmqstream {
     }
 
     Local<Object> frames = args[0]->ToObject();
-    Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
     int length = frames->Get(String::New("length"))->ToInteger()->Value();
     int flags = ZMQ_DONTWAIT;
     int rc;

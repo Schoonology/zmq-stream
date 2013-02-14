@@ -39,11 +39,31 @@ describe('ZMQStream', function () {
     it('should be constructed without error with a type')
 
     describe('write', function () {
-      it('should throw if the Socket is closed')
+      it('should throw if the Socket is closed', function () {
+        var socket = new zmqstream.Socket({
+          type: zmqstream.Type.REQ
+        })
+
+        socket.close()
+
+        expect(function () {
+          socket.write([])
+        }).to.throw('Socket is closed')
+      })
     })
 
     describe('read', function () {
-      it('should throw if the Socket is closed')
+      it('should throw if the Socket is closed', function () {
+        var socket = new zmqstream.Socket({
+          type: zmqstream.Type.REQ
+        })
+
+        socket.close()
+
+        expect(function () {
+          socket.read(0)
+        }).to.throw('Socket is closed')
+      })
     })
 
     describe('REQ-REP', function () {
