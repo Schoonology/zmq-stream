@@ -149,25 +149,35 @@ namespace zmqstream {
 
   void Socket::Init(Handle<Object> target) {
     HandleScope scope;
-    Local<String> name = String::NewSymbol("Socket");
 
     // Local<FunctionTemplate> tmpl = FunctionTemplate::New(New);
 
     constructor = Persistent<FunctionTemplate>::New(FunctionTemplate::New(New));
     // ObjectWrap uses the first internal field to store the wrapped pointer.
     constructor->InstanceTemplate()->SetInternalFieldCount(1);
-    constructor->SetClassName(name);
+    constructor->SetClassName(String::NewSymbol("Socket"));
 
     // Add all prototype methods, getters and setters here.
     NODE_SET_PROTOTYPE_METHOD(constructor, "read", Read);
     NODE_SET_PROTOTYPE_METHOD(constructor, "write", Write);
     NODE_SET_PROTOTYPE_METHOD(constructor, "close", Close);
 
-    NODE_DEFINE_CONSTANT(target, ZMQ_DEALER);
+    Local<Object> Type = Object::New();
+    ZMQ_DEFINE_CONSTANT(Type, "REQ", ZMQ_REQ);
+    ZMQ_DEFINE_CONSTANT(Type, "REP", ZMQ_REP);
+    ZMQ_DEFINE_CONSTANT(Type, "DEALER", ZMQ_DEALER);
+    ZMQ_DEFINE_CONSTANT(Type, "ROUTER", ZMQ_ROUTER);
+    ZMQ_DEFINE_CONSTANT(Type, "PUB", ZMQ_PUB);
+    ZMQ_DEFINE_CONSTANT(Type, "SUB", ZMQ_SUB);
+    ZMQ_DEFINE_CONSTANT(Type, "XPUB", ZMQ_XPUB);
+    ZMQ_DEFINE_CONSTANT(Type, "XSUB", ZMQ_XSUB);
+    ZMQ_DEFINE_CONSTANT(Type, "PUSH", ZMQ_PUSH);
+    ZMQ_DEFINE_CONSTANT(Type, "PULL", ZMQ_PULL);
+    ZMQ_DEFINE_CONSTANT(Type, "PAIR", ZMQ_PAIR);
 
-    // This has to be last, otherwise the properties won't show up on the
-    // object in JavaScript.
-    target->Set(name, constructor->GetFunction());
+    target->Set(String::NewSymbol("Type"), Type, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete));
+    // This has to be last, otherwise the properties won't show up on the object in JavaScript.
+    target->Set(String::NewSymbol("Socket"), constructor->GetFunction());
 
     // TODO: Ensure cleanup like so:
     // AtExit(Cleanup, NULL);

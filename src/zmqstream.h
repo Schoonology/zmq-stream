@@ -85,6 +85,15 @@ namespace zmqstream {
 
       void *socket;
   };
+
+  //
+  // ## Helpers
+  //
+  #define ZMQ_DEFINE_CONSTANT(target, name, constant)                       \
+    (target)->Set(v8::String::NewSymbol(name),                              \
+                  v8::Integer::New(constant),                               \
+                  static_cast<v8::PropertyAttribute>(                       \
+                      v8::ReadOnly|v8::DontDelete))
 }
 
 #endif
