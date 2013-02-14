@@ -37,23 +37,31 @@ namespace zmqstream {
   #define THROW(str) return ThrowException(Exception::Error(String::New(str)));
   #define THROW_REF(str) return ThrowException(Exception::ReferenceError(String::New(str)));
   #define THROW_TYPE(str) return ThrowException(Exception::TypeError(String::New(str)));
+
+  //
+  // ZMQ provides its own error messages, so we'll pass those through to V8.
+  //
   #define ZMQ_THROW() return ThrowException(Exception::Error(String::New(zmq_strerror(zmq_errno()))));
   #define ZMQ_CHECK(rc) if (!isSuccessRC(rc)) return ThrowException(Exception::Error(String::New(zmq_strerror(zmq_errno()))));
+
   //
   // PUSH shorthand for v8::Array.
+  //
   #define PUSH(a, v) a->Set(a->Length(), v);
 
+  //
+  // Because we use ZMQ in a non-blocking way, EAGAIN holds a special place in our hearts.
+  //
   static inline bool isEAGAIN(int rc) {
     return rc == -1 && zmq_errno() == EAGAIN;
   }
 
+  //
+  // ZMQ returns -1 on failure, so this is a simple test for that _ignoring_ EAGAIN.
+  //
   static inline bool isSuccessRC(int rc) {
     // Ignore EAGAIN. EAGAIN is handled in a sane, call-specific manner.
     return rc != -1 || isEAGAIN(rc);
-  }
-
-  static inline Handle<Value> ThrowZmqError() {
-    THROW(zmq_strerror(zmq_errno()));
   }
 
   //
@@ -207,14 +215,10 @@ namespace zmqstream {
       //  * 'drain' event
       //  * Investigate caching in JS and sending one event loop's worth every tick.
       rc = zmq_send(self->socket, Buffer::Data(buffer), Buffer::Length(buffer), i < length - 1 ? ZMQ_SNDMORE | flags : flags);
+      ZMQ_CHECK(rc);
 
-      if (rc == -1) {
-        if (zmq_errno() == EAGAIN) {
-          return scope.Close(Boolean::New(0));
-        } else {
-          // TODO: Real error type.
-          ThrowException(Exception::TypeError(String::New(zmq_strerror(zmq_errno()))));
-        }
+      if (isEAGAIN(rc)) {
+        return scope.Close(Boolean::New(0));
       }
     }
 
@@ -226,11 +230,11 @@ namespace zmqstream {
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
     if (self->socket == NULL) {
-      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be connected.")));
+      THROW_REF("Socket is closed, and cannot be connected.");
     }
 
     if (args.Length() != 1 || !args[0]->IsString()) {
-      return ThrowException(Exception::TypeError(String::New("No endpoint specified to connect to.")));
+      THROW_TYPE("No endpoint specified to connect to.");
     }
 
     String::AsciiValue endpoint(args[0]->ToString());
@@ -245,11 +249,11 @@ namespace zmqstream {
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
     if (self->socket == NULL) {
-      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be disconnected.")));
+      THROW_REF("Socket is closed, and cannot be disconnected.");
     }
 
     if (args.Length() != 1 || !args[0]->IsString()) {
-      return ThrowException(Exception::TypeError(String::New("No endpoint specified to disconnect from.")));
+      THROW_TYPE("No endpoint specified to disconnect from.");
     }
 
     String::AsciiValue endpoint(args[0]->ToString());
@@ -264,11 +268,11 @@ namespace zmqstream {
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
     if (self->socket == NULL) {
-      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be bound.")));
+      THROW_REF("Socket is closed, and cannot be bound.");
     }
 
     if (args.Length() != 1 || !args[0]->IsString()) {
-      return ThrowException(Exception::TypeError(String::New("No endpoint specified to bind to.")));
+      THROW_TYPE("No endpoint specified to bind to.");
     }
 
     String::AsciiValue endpoint(args[0]->ToString());
@@ -283,11 +287,11 @@ namespace zmqstream {
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
     if (self->socket == NULL) {
-      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be unbound.")));
+      THROW_REF("Socket is closed, and cannot be unbound.");
     }
 
     if (args.Length() != 1 || !args[0]->IsString()) {
-      return ThrowException(Exception::TypeError(String::New("No endpoint specified to unbind from.")));
+      THROW_TYPE("No endpoint specified to unbind from.");
     }
 
     String::AsciiValue endpoint(args[0]->ToString());
