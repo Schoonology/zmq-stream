@@ -142,6 +142,22 @@ namespace zmqstream {
     return args.This();
   }
 
+  //
+  // ## Read `Read(size)`
+  //
+  // Consumes a minimum of **size** messages of data from the ZMQ socket. If **size** is undefined, the entire
+  // queue will be read and returned.
+  //
+  // If there is no data to consume, or if there are fewer bytes in the internal buffer than the size argument,
+  // then null is returned, and a future 'readable' event will be emitted when more is available.
+  //
+  // Calling stream.read(0) is a no-op with no internal side effects, but can be used to test for Socket validity.
+  //
+  // Returns an Array of Messages, which are in turn Arrays of Frames as Node Buffers.
+  //
+  // NOTE: To reiterate, this Read returns a different format than the builtin Duplex, which is a single Buffer or
+  // String. Additionally, there is no encoding support.
+  //
   Handle<Value> Socket::Read(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
@@ -194,7 +210,17 @@ namespace zmqstream {
   }
 
   //
-  // write([Buffer]) -> Boolean
+  // ## Write `Write(message)`
+  //
+  // Writes **message** to the ZMQ socket to be transmitted over the wire at some time in the future.
+  //
+  // Calling stream.write([]) is a no-op with no internal side effects, but can be used for test for Socket
+  // validity.
+  //
+  // Returns true if **message** was queued successfully, or false if the buffer is full (see ZMQ_DONTWAIT/EAGAIN).
+  //
+  // NOTE: Unlike the builtin Duplex class, a return value of `false` indicates the write was _unsuccessful_, and
+  // will need to be tried again.
   //
   Handle<Value> Socket::Write(const Arguments& args) {
     HandleScope scope;
@@ -237,6 +263,13 @@ namespace zmqstream {
     return scope.Close(Boolean::New(1));
   }
 
+  //
+  // ## Connect `Connect(endpoint)`
+  //
+  // Connects the ZMQ socket to **endpoint**, expressed as a String.
+  //
+  // Connect is synchronous, and will throw an Error upon failure.
+  //
   Handle<Value> Socket::Connect(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
@@ -256,6 +289,13 @@ namespace zmqstream {
     return scope.Close(Undefined());
   }
 
+  //
+  // ## Disconnect `Disconnect(endpoint)`
+  //
+  // Disconnects the ZMQ socket from **endpoint**, expressed as a String.
+  //
+  // Disconnect is synchronous, and will throw an Error upon failure.
+  //
   Handle<Value> Socket::Disconnect(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
@@ -275,6 +315,13 @@ namespace zmqstream {
     return scope.Close(Undefined());
   }
 
+  //
+  // ## Bind `Bind(endpoint)`
+  //
+  // Binds the ZMQ socket to **endpoint**, expressed as a String.
+  //
+  // Bind is synchronous, and will throw an Error upon failure.
+  //
   Handle<Value> Socket::Bind(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
@@ -294,6 +341,13 @@ namespace zmqstream {
     return scope.Close(Undefined());
   }
 
+  //
+  // ## Unbind `Unbind(endpoint)`
+  //
+  // Unbinds the ZMQ socket from **endpoint**, expressed as a String.
+  //
+  // Unbind is synchronous, and will throw an Error upon failure.
+  //
   Handle<Value> Socket::Unbind(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
@@ -313,7 +367,10 @@ namespace zmqstream {
     return scope.Close(Undefined());
   }
 
-  void Socket::Install(Handle<Object> target) {
+  //
+  // Exports the Socket class within the module `target`.
+  //
+  void Socket::InstallExports(Handle<Object> target) {
     HandleScope scope;
 
     constructor = Persistent<FunctionTemplate>::New(FunctionTemplate::New(New));
@@ -352,5 +409,5 @@ namespace zmqstream {
     // AtExit(Cleanup, NULL);
   }
 
-  NODE_MODULE(zmqstream, Socket::Install);
+  NODE_MODULE(zmqstream, Socket::InstallExports);
 }

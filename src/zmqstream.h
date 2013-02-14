@@ -27,7 +27,7 @@ namespace zmqstream {
   class Socket : public node::ObjectWrap {
     public:
       static v8::Persistent<v8::FunctionTemplate> constructor;
-      static void Install(v8::Handle<v8::Object> target);
+      static void InstallExports(v8::Handle<v8::Object> target);
 
       virtual ~Socket();
 
