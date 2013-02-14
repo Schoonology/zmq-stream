@@ -1,30 +1,36 @@
 /*global describe:true, it:true, before:true, after:true, beforeEach:true, afterEach:true */
 var zmqstream = require('../lib/zmqstream')
   , expect = require('chai').expect
+  , testSockets = []
 
 function getInprocEndpoint() {
-  return 'inproc://zmqstreamtest' + Math.random().toString().slice(2, 6)
+  return 'inproc://zmqstreamtest' + Math.random().toString().slice(2)
 }
+
+// A passthrough for the zmqstream.Socket constructor that caches all created sockets for cleanup.
+function Socket(options) {
+  var socket
+
+  if (this instanceof Socket) {
+    socket = new zmqstream.Socket(options)
+  } else {
+    socket = zmqstream.Socket(options)
+  }
+
+  testSockets.push(socket)
+  return socket
+}
+
+process.on('exit', function () {
+  testSockets.forEach(function (socket) {
+    socket && socket.close()
+  })
+})
 
 describe('ZMQStream', function () {
   it('should exist', function () {
     expect(zmqstream).to.exist
     expect(zmqstream).to.be.an('object')
-  })
-
-  before(function () {
-    var self = this
-
-    self.sockets = []
-  })
-
-  afterEach(function () {
-    var self = this
-
-    self.sockets.forEach(function (socket) {
-      socket.close()
-    })
-    self.sockets = []
   })
 
   describe('Constants', function () {
@@ -55,19 +61,19 @@ describe('ZMQStream', function () {
     })
 
     it('should default to PAIR if no options are provided', function () {
-      var socket = new zmqstream.Socket()
+      var socket = new Socket()
 
       expect(socket.type).to.equal(zmqstream.Type.PAIR)
     })
 
     it('should default to PAIR if no type is provided', function () {
-      var socket = new zmqstream.Socket({})
+      var socket = new Socket({})
 
       expect(socket.type).to.equal(zmqstream.Type.PAIR)
     })
 
     it('should construct an object be the correct type', function () {
-      var socket = zmqstream.Socket()
+      var socket = Socket()
 
       expect(socket).to.exist
       expect(socket).to.be.an('object')
@@ -75,7 +81,7 @@ describe('ZMQStream', function () {
     })
 
     it('should be constructed without error when called without new', function () {
-      var socket = zmqstream.Socket()
+      var socket = Socket()
 
       expect(socket).to.exist
       expect(socket).to.be.an.instanceof(zmqstream.Socket)
@@ -86,7 +92,7 @@ describe('ZMQStream', function () {
       beforeEach(function () {
         var self = this
 
-        self.socket = new zmqstream.Socket()
+        self.socket = Socket()
       })
 
       it('should be callable without error with 0 frames', function () {
@@ -102,7 +108,7 @@ describe('ZMQStream', function () {
       })
 
       it('should throw if the Socket is closed', function () {
-        var socket = new zmqstream.Socket({
+        var socket = Socket({
           type: zmqstream.Type.REQ
         })
 
@@ -118,8 +124,13 @@ describe('ZMQStream', function () {
       beforeEach(function () {
         var self = this
 
-        self.socket = new zmqstream.Socket()
+        self.socket = new Socket()
+        self.sender = new Socket()
+
         self.endpoint = getInprocEndpoint()
+
+        self.sender.bind(self.endpoint)
+        self.socket.connect(self.endpoint)
       })
 
       it('should be callable without error with 0 frames', function () {
@@ -135,13 +146,9 @@ describe('ZMQStream', function () {
       })
 
       it('should receive the frames of a single message in order', function () {
-        var sender = new zmqstream.Socket()
-          , message = [new Buffer('one'), new Buffer('two')]
+        var message = [new Buffer('one'), new Buffer('two')]
 
-        sender.bind(this.endpoint)
-        this.socket.connect(this.endpoint)
-
-        sender.write(message)
+        this.sender.write(message)
         message = this.socket.read()
 
         expect(message).to.exist
@@ -158,17 +165,13 @@ describe('ZMQStream', function () {
       })
 
       it('should receive multiple messages in order', function () {
-        var sender = new zmqstream.Socket()
-          , messages = [
+        var messages = [
               [new Buffer('one'), new Buffer('two')],
               [new Buffer('three'), new Buffer('four'), new Buffer('five')]
             ]
 
-        sender.bind(this.endpoint)
-        this.socket.connect(this.endpoint)
-
-        sender.write(messages[0])
-        sender.write(messages[1])
+        this.sender.write(messages[0])
+        this.sender.write(messages[1])
         messages = this.socket.read()
 
         // Two messages
@@ -196,7 +199,7 @@ describe('ZMQStream', function () {
       })
 
       it('should throw if the Socket is closed', function () {
-        var socket = new zmqstream.Socket({
+        var socket = new Socket({
           type: zmqstream.Type.REQ
         })
 
@@ -210,7 +213,7 @@ describe('ZMQStream', function () {
 
     describe('bind', function () {
       beforeEach(function () {
-        this.socket = new zmqstream.Socket()
+        this.socket = new Socket()
         this.endpoint = getInprocEndpoint()
       })
 
@@ -229,8 +232,11 @@ describe('ZMQStream', function () {
 
     describe('connect', function () {
       beforeEach(function () {
-        this.socket = new zmqstream.Socket()
+        this.socket = new Socket()
         this.endpoint = getInprocEndpoint()
+
+        this.sink = new Socket()
+        this.sink.bind(this.endpoint)
       })
 
       it('should be callable without error', function () {
@@ -248,13 +254,11 @@ describe('ZMQStream', function () {
 
     describe('unbind', function () {
       beforeEach(function () {
-        this.socket = new zmqstream.Socket()
+        this.socket = new Socket()
         this.endpoint = getInprocEndpoint()
       })
 
-      it('should be callable without error', function () {
-        this.socket.unbind(this.endpoint)
-      })
+      it('should be callable without error')
 
       it('should throw if no endpoint is provided', function () {
         var self = this
@@ -267,13 +271,11 @@ describe('ZMQStream', function () {
 
     describe('disconnect', function () {
       beforeEach(function () {
-        this.socket = new zmqstream.Socket()
+        this.socket = new Socket()
         this.endpoint = getInprocEndpoint()
       })
 
-      it('should be callable without error', function () {
-        this.socket.disconnect(this.endpoint)
-      })
+      it('should be callable without error')
 
       it('should throw if no endpoint is provided', function () {
         var self = this

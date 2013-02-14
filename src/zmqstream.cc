@@ -14,6 +14,12 @@ namespace zmqstream {
   ScopedContext gContext;
   Persistent<FunctionTemplate> Socket::constructor;
 
+  //
+  // ## ScopedContext
+  //
+  // At the moment, there's a 1:1 relationship between Node processes and ZMQ contexts. This scope-based wrapper
+  // is used to ensure that global context is managed properly over the life of that process.
+  //
   ScopedContext::ScopedContext() {
     context = zmq_ctx_new();
   }
@@ -23,15 +29,47 @@ namespace zmqstream {
     printf("~Context\n");
   }
 
+  //
+  // ## Helpers
+  //
+  // These "throw" helpers bail the calling context immediately.
+  //
+  #define THROW(str) return ThrowException(Exception::Error(String::New(str)));
+  #define THROW_REF(str) return ThrowException(Exception::ReferenceError(String::New(str)));
+  #define THROW_TYPE(str) return ThrowException(Exception::TypeError(String::New(str)));
+  #define ZMQ_THROW() return ThrowException(Exception::Error(String::New(zmq_strerror(zmq_errno()))));
+  #define ZMQ_CHECK(rc) if (!isSuccessRC(rc)) return ThrowException(Exception::Error(String::New(zmq_strerror(zmq_errno()))));
+  //
+  // PUSH shorthand for v8::Array.
+  #define PUSH(a, v) a->Set(a->Length(), v);
+
+  static inline bool isEAGAIN(int rc) {
+    return rc == -1 && zmq_errno() == EAGAIN;
+  }
+
+  static inline bool isSuccessRC(int rc) {
+    // Ignore EAGAIN. EAGAIN is handled in a sane, call-specific manner.
+    return rc != -1 || isEAGAIN(rc);
+  }
+
+  static inline Handle<Value> ThrowZmqError() {
+    THROW(zmq_strerror(zmq_errno()));
+  }
+
+  //
+  // ## Socket
+  //
+  // Much like the native `net` module, a ZMQStream socket (perhaps obviously) is really just a Duplex stream that
+  // you can `connect`, `bind`, etc. just like a native ZMQ socket.
+  //
   Socket::Socket(int type) : ObjectWrap() {
     this->socket = zmq_socket(gContext.context, type);
-
-    zmq_setsockopt(this->socket, ZMQ_IDENTITY, "TestClient", 10);
+    assert(this->socket != 0);
   }
 
   Socket::~Socket() {
     if (this->socket) {
-      zmq_close(this->socket);
+      assert(zmq_close(this->socket) == 0);
     }
 
     printf("~Socket\n");
@@ -40,13 +78,16 @@ namespace zmqstream {
   Handle<Value> Socket::Close(const Arguments& args) {
     HandleScope scope;
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
+    void* socket = self->socket;
 
-    if (self->socket == NULL) {
+    if (socket == NULL) {
       return scope.Close(Undefined());
     }
 
-    zmq_close(self->socket);
     self->socket = NULL;
+
+    ZMQ_CHECK(zmq_close(socket));
+
     return scope.Close(Undefined());
   }
 
@@ -79,6 +120,9 @@ namespace zmqstream {
     // Establishes initial property values.
     args.This()->Set(String::NewSymbol("type"), type);
 
+    // TODO
+    ZMQ_CHECK(zmq_setsockopt(obj->socket, ZMQ_IDENTITY, "TestClient", 10));
+
     return args.This();
   }
 
@@ -87,7 +131,7 @@ namespace zmqstream {
     Socket *self = ObjectWrap::Unwrap<Socket>(args.This());
 
     if (self->socket == NULL) {
-      return ThrowException(Exception::ReferenceError(String::New("Socket is closed, and cannot be read from.")));
+      THROW_REF("Socket is closed, and cannot be read from.");
     }
 
     int size = -1;
@@ -100,24 +144,28 @@ namespace zmqstream {
       return scope.Close(Null());
     }
 
+    int rc = 0;
     zmq_msg_t part;
-    Handle<Object> frame;
     Handle<Array> messages = Array::New();
     Handle<Array> message = Array::New();
 
     messages->Set(messages->Length(), message);
 
     do {
-      zmq_msg_close(&part);
-      zmq_msg_init(&part);
+      ZMQ_CHECK(zmq_msg_init(&part));
 
-      if (zmq_msg_recv(&part, self->socket, ZMQ_DONTWAIT) == EAGAIN) {
-        return scope.Close(Null());
+      rc = zmq_msg_recv(&part, self->socket, ZMQ_DONTWAIT);
+      ZMQ_CHECK(rc);
+
+      if (!isEAGAIN(rc)) {
+        message->Set(message->Length(), Buffer::New(String::New((char*)zmq_msg_data(&part), zmq_msg_size(&part))));
+
+        // In this case, we actually want to flip `rc`, because an rc of 0 means there's no more.
+        rc = !zmq_msg_more(&part);
       }
 
-      frame = Buffer::New(String::New((char*)zmq_msg_data(&part), zmq_msg_size(&part)));
-      message->Set(message->Length(), frame);
-    } while (zmq_msg_more(&part));
+      ZMQ_CHECK(zmq_msg_close(&part));
+    } while (rc == 0);
 
     return scope.Close(messages);
   }
@@ -155,11 +203,7 @@ namespace zmqstream {
       Handle<Object> buffer = frames->Get(i)->ToObject();
 
       // TODO:
-      //  * Real return value
       //  * Error handling
-      //  * Reads
-      //  * Other socket types
-      //  * Testing
       //  * 'drain' event
       //  * Investigate caching in JS and sending one event loop's worth every tick.
       rc = zmq_send(self->socket, Buffer::Data(buffer), Buffer::Length(buffer), i < length - 1 ? ZMQ_SNDMORE | flags : flags);
@@ -191,7 +235,7 @@ namespace zmqstream {
 
     String::AsciiValue endpoint(args[0]->ToString());
 
-    zmq_connect(self->socket, *endpoint);
+    ZMQ_CHECK(zmq_connect(self->socket, *endpoint));
 
     return scope.Close(Undefined());
   }
@@ -210,7 +254,7 @@ namespace zmqstream {
 
     String::AsciiValue endpoint(args[0]->ToString());
 
-    zmq_disconnect(self->socket, *endpoint);
+    ZMQ_CHECK(zmq_disconnect(self->socket, *endpoint));
 
     return scope.Close(Undefined());
   }
@@ -229,7 +273,7 @@ namespace zmqstream {
 
     String::AsciiValue endpoint(args[0]->ToString());
 
-    zmq_bind(self->socket, *endpoint);
+    ZMQ_CHECK(zmq_bind(self->socket, *endpoint));
 
     return scope.Close(Undefined());
   }
@@ -248,7 +292,7 @@ namespace zmqstream {
 
     String::AsciiValue endpoint(args[0]->ToString());
 
-    zmq_unbind(self->socket, *endpoint);
+    ZMQ_CHECK(zmq_unbind(self->socket, *endpoint));
 
     return scope.Close(Undefined());
   }
