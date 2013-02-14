@@ -61,19 +61,26 @@ namespace zmqstream {
     HandleScope scope;
 
     if (!args.IsConstructCall()) {
-      return ThrowException(Exception::TypeError(
-        String::New("Use the new operator to create instances of this object."))
-      );
+      Handle<Value> argv[1] = { args[0] };
+      return constructor->GetFunction()->NewInstance(1, argv);
     }
 
-    if (args.Length() < 1) {
-      return ThrowException(Exception::TypeError(
-        String::New("First argument must be a number")));
+    Handle<Object> options;
+
+    if (args.Length() < 1 || !args[0]->IsObject()) {
+      options = Object::New();
+    } else {
+      options = args[0]->ToObject();
     }
+
+    Handle<Integer> type = options->Get(String::NewSymbol("type"))->ToInteger();
 
     // Creates a new instance object of this type and wraps it.
-    Socket* obj = new Socket(args[0]->ToInteger()->Value());
+    Socket* obj = new Socket(type->Value());
     obj->Wrap(args.This());
+
+    // Establishes initial property values.
+    args.This()->Set(String::NewSymbol("type"), type);
 
     return args.This();
   }
@@ -144,12 +151,11 @@ namespace zmqstream {
     return scope.Close(Boolean::New(1));
   }
 
-  void Socket::Init(Handle<Object> target) {
+  void Socket::Install(Handle<Object> target) {
     HandleScope scope;
 
-    // Local<FunctionTemplate> tmpl = FunctionTemplate::New(New);
-
     constructor = Persistent<FunctionTemplate>::New(FunctionTemplate::New(New));
+
     // ObjectWrap uses the first internal field to store the wrapped pointer.
     constructor->InstanceTemplate()->SetInternalFieldCount(1);
     constructor->SetClassName(String::NewSymbol("Socket"));
@@ -180,5 +186,5 @@ namespace zmqstream {
     // AtExit(Cleanup, NULL);
   }
 
-  NODE_MODULE(zmqstream, Socket::Init);
+  NODE_MODULE(zmqstream, Socket::Install);
 }

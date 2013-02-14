@@ -27,7 +27,7 @@ namespace zmqstream {
   class Socket : public node::ObjectWrap {
     public:
       static v8::Persistent<v8::FunctionTemplate> constructor;
-      static void Init(v8::Handle<v8::Object> target);
+      static void Install(v8::Handle<v8::Object> target);
 
       virtual ~Socket();
 
@@ -35,9 +35,9 @@ namespace zmqstream {
       Socket(int type);
 
       //
-      // ## Socket(type)
+      // ## Socket(options)
       //
-      // Creates a new **type** ZMQ socket.
+      // Creates a new **options.type** ZMQ socket. Defaults to PAIR.
       //
       static v8::Handle<v8::Value> New(const v8::Arguments& args);
 
