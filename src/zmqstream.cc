@@ -501,6 +501,13 @@ namespace zmqstream {
     // This has to be last, otherwise the properties won't show up on the object in JavaScript.
     target->Set(String::NewSymbol("Socket"), constructor);
 
+    int major, minor, patch;
+    char version[100];
+
+    zmq_version(&major, &minor, &patch);
+    sprintf(version, "v%d.%d.%d", major, minor, patch);
+    target->Set(String::NewSymbol("version"), String::New(version));
+
     // TODO: Ensure cleanup like so:
     // AtExit(Cleanup, NULL);
   }
