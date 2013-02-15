@@ -27,6 +27,5 @@
   "author": "Michael Schoonmaker <michael.r.schoonmaker@gmail.com>",
   "license": "MIT",
   "gypfile": true,
-  "readmeFilename": "README.md",
-  "gitHead": "fa69a9eb0d7caba2dc8a9030ea42427b6e357fe4"
+  "readmeFilename": "README.md"
 }
