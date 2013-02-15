@@ -266,7 +266,7 @@ namespace zmqstream {
 
     Local<Object> frames = args[0]->ToObject();
     int length = frames->Get(String::New("length"))->ToInteger()->Value();
-    int flags = ZMQ_DONTWAIT;
+    Handle<Object> buffer;
     int rc;
 
     for (int i = 0; i < length; i++) {
@@ -276,9 +276,9 @@ namespace zmqstream {
     }
 
     for (int i = 0; i < length; i++) {
-      Handle<Object> buffer = frames->Get(i)->ToObject();
+      buffer = frames->Get(i)->ToObject();
 
-      rc = zmq_send(self->socket, Buffer::Data(buffer), Buffer::Length(buffer), i < length - 1 ? ZMQ_SNDMORE | flags : flags);
+      rc = zmq_send(self->socket, Buffer::Data(buffer), Buffer::Length(buffer), i < length - 1 ? ZMQ_SNDMORE | ZMQ_DONTWAIT : ZMQ_DONTWAIT);
       ZMQ_CHECK(rc);
 
       if (isEAGAIN(rc)) {
