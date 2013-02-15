@@ -96,9 +96,6 @@ namespace zmqstream {
   //
   // Creates a new **options.type** ZMQ socket. Defaults to PAIR.
   //
-  // TODO:
-  //  * Handle highWaterMark and lowWaterMark options.
-  //
   Handle<Value> Socket::New(const Arguments& args) {
     HandleScope scope;
 
@@ -116,10 +113,16 @@ namespace zmqstream {
     }
 
     Handle<Integer> type = options->Get(String::NewSymbol("type"))->ToInteger();
+    int32_t hwm = options->Get(String::NewSymbol("highWaterMark"))->ToInteger()->Int32Value();
 
     // Creates a new instance object of this type and wraps it.
     Socket* obj = new Socket(type->Value());
     obj->Wrap(args.This());
+
+    if (hwm > 0) {
+      ZMQ_CHECK(zmq_setsockopt(obj->socket, ZMQ_SNDHWM, &hwm, sizeof hwm));
+      ZMQ_CHECK(zmq_setsockopt(obj->socket, ZMQ_RCVHWM, &hwm, sizeof hwm));
+    }
 
     // Establishes initial property values.
     args.This()->Set(String::NewSymbol("type"), type);
