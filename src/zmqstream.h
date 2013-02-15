@@ -26,13 +26,40 @@ namespace zmqstream {
   //
   class Socket : public node::ObjectWrap {
     public:
-      static v8::Persistent<v8::FunctionTemplate> constructor;
+      static v8::Persistent<v8::Function> constructor;
+
+      //
+      // ## Initialize
+      //
+      // Creates and populates the constructor Function and its prototype.
+      //
+      static void Initialize();
+
+      //
+      // ## InstallExports
+      //
+      // Exports the Socket class within the module `target`.
+      //
       static void InstallExports(v8::Handle<v8::Object> target);
+
+      //
+      // ## Check
+      //
+      // To generate `'readable'` and `'drain'` events, we need to be polling our socket handles periodically. We
+      // define that period to be once per event loop tick, and this is our libuv callback to handle that.
+      //
+      static void Check(uv_check_t* handle, int status);
 
       virtual ~Socket();
 
     protected:
       void *socket;
+      uv_check_t handle;
+
+      // We've fired the `'drain'` event, but have not called `write` yet.
+      bool drain;
+      // We've fired the `'readable'` event, but have not called `read` yet.
+      bool readable;
 
       Socket(int type);
 
@@ -53,7 +80,7 @@ namespace zmqstream {
       //
       // ## Read `Read(size)`
       //
-      // Consumes a minimum of **size** messages of data from the ZMQ socket. If **size** is undefined, the entire
+      // Consumes a maximum of **size** messages of data from the ZMQ socket. If **size** is undefined, the entire
       // queue will be read and returned.
       //
       // If there is no data to consume, or if there are fewer bytes in the internal buffer than the size argument,
@@ -63,8 +90,8 @@ namespace zmqstream {
       //
       // Returns an Array of Messages, which are in turn Arrays of Frames as Node Buffers.
       //
-      // NOTE: To reiterate, this Read returns a different format than the builtin Duplex, which is a single Buffer or
-      // String. Additionally, there is no encoding support.
+      // NOTE: To reiterate, this Read returns a different amount and different format than the builtin Duplex, which
+      // is a single Buffer or String of <= `size`. Because of this, there is no encoding support.
       //
       static v8::Handle<v8::Value> Read(const v8::Arguments& args);
 
