@@ -1,13 +1,12 @@
-var zmqstream = require('./lib/zmqstream')
-  , BROKER_URL = 'ipc:///tmp/zmqtestbr'
+var zmqstream = require('../lib/zmqstream')
+  , BROKER_URL = process.argv[4] || 'ipc:///tmp/zmqtestbr'
   , start = Date.now()
   , count = parseInt(process.argv[2], 10) || 1000
   , type = process.argv[3] || 'DEALER'
   , stream = new zmqstream.Socket({
-      type: zmqstream[zmqstream.Type[type]]
+      type: zmqstream.Type[type]
     })
   , sent = 0
-  , id
 
 console.log('Venting ' + count + ' messages with a ' + type + '(' + stream.type + ') socket.')
 
@@ -15,7 +14,6 @@ function done() {
   console.log('Sent:', sent)
   console.log('Rate:', sent / (Date.now() - start) * 1000)
   stream.close()
-  clearInterval(id)
 }
 
 function send() {
@@ -41,7 +39,5 @@ stream.on('drain', function () {
   send()
 })
 send()
-
-id = setInterval(function () {})
 
 module.exports = zmqstream

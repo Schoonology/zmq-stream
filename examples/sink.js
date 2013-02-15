@@ -1,5 +1,5 @@
-var zmqstream = require('./lib/zmqstream')
-  , BROKER_URL = 'ipc:///tmp/zmqtestbr'
+var zmqstream = require('../lib/zmqstream')
+  , BROKER_URL = process.argv[4] || 'ipc:///tmp/zmqtestbr'
   , start = null
   , count = parseInt(process.argv[2], 10) || 1000
   , type = process.argv[3] || 'ROUTER'
@@ -7,7 +7,6 @@ var zmqstream = require('./lib/zmqstream')
       type: zmqstream.Type[type]
     })
   , received = 0
-  , id
 
 console.log('Sinking ' + count + ' messages with a ' + type + '(' + stream.type + ') socket.')
 
@@ -15,11 +14,10 @@ function done() {
   console.log('Received:', received)
   console.log('Rate:', received / (Date.now() - start) * 1000)
   stream.close()
-  clearInterval(id)
 }
 
 function recv() {
-  var messages = stream.read(1000)
+  var messages = stream.read(100)
 
   if (messages) {
     if (start == null) {
@@ -32,7 +30,7 @@ function recv() {
     if (received >= count) {
       done()
     } else {
-      recv()
+      process.nextTick(recv)
     }
   } else {
     console.log('EAGAIN:', received)
@@ -47,7 +45,5 @@ stream.on('readable', function () {
 })
 
 recv()
-
-id = setInterval(function () {})
 
 module.exports = zmqstream
