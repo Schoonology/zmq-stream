@@ -78,6 +78,20 @@ namespace zmqstream {
       static v8::Handle<v8::Value> Close(const v8::Arguments& args);
 
       //
+      // ## SetOption `SetOption(option, value)`
+      //
+      // Sets a ZMQ-specific option on the underlying ZMQ socket.
+      //
+      static v8::Handle<v8::Value> SetOption(const v8::Arguments& args);
+
+      //
+      // ## GetOption `GetOption(option)`
+      //
+      // Retrieves a ZMQ-specific option from the underlying ZMQ socket.
+      //
+      static v8::Handle<v8::Value> GetOption(const v8::Arguments& args);
+
+      //
       // ## Read `Read(size)`
       //
       // Consumes a maximum of **size** messages of data from the ZMQ socket. If **size** is undefined, the entire
@@ -146,15 +160,6 @@ namespace zmqstream {
       //
       static v8::Handle<v8::Value> Unbind(const v8::Arguments& args);
   };
-
-  //
-  // ## Helpers
-  //
-  #define ZMQ_DEFINE_CONSTANT(target, name, constant)                       \
-    (target)->Set(v8::String::NewSymbol(name),                              \
-                  v8::Integer::New(constant),                               \
-                  static_cast<v8::PropertyAttribute>(                       \
-                      v8::ReadOnly|v8::DontDelete))
 }
 
 #endif

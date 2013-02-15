@@ -57,6 +57,16 @@ namespace zmqstream {
   #define THIS_TO_SOCKET(obj) ObjectWrap::Unwrap<Socket>(obj)
 
   //
+  // Internal version of NODE_DEFINE_CONSTANT to allow for names without the ZMQ_ prefix.
+  //
+  #define ZMQ_DEFINE_CONSTANT(target, name, constant)                  \
+    (target)->Set(                                                     \
+      v8::String::NewSymbol(name),                                     \
+      v8::Integer::New(constant),                                      \
+      static_cast<v8::PropertyAttribute>(v8::ReadOnly|v8::DontDelete)  \
+    );
+
+  //
   // Because we use ZMQ in a non-blocking way, EAGAIN holds a special place in our hearts.
   //
   static inline bool isEAGAIN(int rc) {
@@ -150,7 +160,9 @@ namespace zmqstream {
   Handle<Value> Socket::Close(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
-    void* socket = self->socket;
+    assert(self);
+
+    void *socket = self->socket;
 
     uv_idle_stop(&self->handle);
 
@@ -168,6 +180,189 @@ namespace zmqstream {
     // delete self;
 
     return scope.Close(Undefined());
+  }
+
+  //
+  // ## SetOption `SetOption(option, value)`
+  //
+  // Sets a ZMQ-specific option on the underlying ZMQ socket.
+  //
+  Handle<Value> Socket::SetOption(const Arguments& args) {
+    HandleScope scope;
+    Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
+
+    if (self->socket == NULL) {
+      THROW_REF("Socket is closed, and options cannot be set.");
+    }
+
+    if (args.Length() < 1 || !args[0]->IsNumber()) {
+      THROW_TYPE("No option type specified.");
+    }
+
+    if (args.Length() < 2) {
+      THROW_TYPE("No option value specified.");
+    }
+
+    int type = args[0]->Int32Value();
+    void *value = NULL;
+    size_t size = 0;
+    int rc;
+
+    switch (type) {
+      // char*
+      case ZMQ_SUBSCRIBE:
+      case ZMQ_UNSUBSCRIBE:
+      case ZMQ_IDENTITY:
+      case ZMQ_TCP_ACCEPT_FILTER:
+        size = args[1]->ToString()->Length();
+        value = malloc(size);
+        args[1]->ToString()->WriteAscii((char*)value, 0, size);
+        break;
+      // int
+      case ZMQ_RATE:
+      case ZMQ_RECOVERY_IVL:
+      case ZMQ_SNDBUF:
+      case ZMQ_RCVBUF:
+      case ZMQ_LINGER:
+      case ZMQ_RECONNECT_IVL:
+      case ZMQ_RECONNECT_IVL_MAX:
+      case ZMQ_MULTICAST_HOPS:
+      case ZMQ_RCVTIMEO:
+      case ZMQ_SNDTIMEO:
+      case ZMQ_TCP_KEEPALIVE:
+      case ZMQ_TCP_KEEPALIVE_IDLE:
+      case ZMQ_TCP_KEEPALIVE_CNT:
+      case ZMQ_TCP_KEEPALIVE_INTVL:
+        size = sizeof(int);
+        value = malloc(size);
+        ((int*)value)[0] = args[1]->Int32Value();
+      // bool
+      case ZMQ_IPV4ONLY:
+      case ZMQ_DELAY_ATTACH_ON_CONNECT:
+      case ZMQ_ROUTER_MANDATORY:
+      case ZMQ_XPUB_VERBOSE:
+        size = sizeof(bool);
+        value = malloc(size);
+        ((bool*)value)[0] = args[1]->Int32Value() > 0 ? 1 : 0;
+        break;
+      // uint64_t
+      case ZMQ_AFFINITY:
+        size = sizeof(uint64_t);
+        value = malloc(size);
+        ((uint64_t*)value)[0] = args[1]->Uint32Value();
+        break;
+      // int64_t
+      case ZMQ_MAXMSGSIZE:
+        size = sizeof(int64_t);
+        value = malloc(size);
+        ((int64_t*)value)[0] = args[1]->IntegerValue();
+        break;
+    }
+
+    // TODO: Support other option values.
+    rc = zmq_setsockopt(self->socket, type, value, size);
+
+    if (value != NULL) {
+      free(value);
+    }
+
+    ZMQ_CHECK(rc);
+
+    return scope.Close(Undefined());
+  }
+
+  //
+  // ## GetOption `GetOption(option)`
+  //
+  // Retrieves a ZMQ-specific option from the underlying ZMQ socket.
+  //
+  Handle<Value> Socket::GetOption(const Arguments& args) {
+    HandleScope scope;
+    Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
+
+    if (self->socket == NULL) {
+      THROW_REF("Socket is closed, and options cannot be retrieved.");
+    }
+
+    if (args.Length() < 1 || !args[0]->IsNumber()) {
+      THROW_TYPE("No option type specified.");
+    }
+
+    Handle<Value> retval;
+    int type = args[0]->Int32Value();
+    void *value = NULL;
+    size_t size = 0;
+    int rc;
+
+    switch (type) {
+      // char*
+      case ZMQ_IDENTITY:
+      case ZMQ_LAST_ENDPOINT:
+        size = 128;
+        value = malloc(size);
+        rc = zmq_getsockopt(self->socket, type, value, &size);
+        retval = String::New((char*)value, size);
+        break;
+      // int
+      case ZMQ_TYPE:
+      case ZMQ_SNDHWM:
+      case ZMQ_RCVHWM:
+      case ZMQ_RATE:
+      case ZMQ_RECOVERY_IVL:
+      case ZMQ_SNDBUF:
+      case ZMQ_RCVBUF:
+      case ZMQ_LINGER:
+      case ZMQ_RECONNECT_IVL:
+      case ZMQ_RECONNECT_IVL_MAX:
+      case ZMQ_BACKLOG:
+      case ZMQ_MULTICAST_HOPS:
+      case ZMQ_RCVTIMEO:
+      case ZMQ_SNDTIMEO:
+      // case ZMQ_FD:
+      case ZMQ_EVENTS:
+      case ZMQ_TCP_KEEPALIVE:
+      case ZMQ_TCP_KEEPALIVE_IDLE:
+      case ZMQ_TCP_KEEPALIVE_CNT:
+      case ZMQ_TCP_KEEPALIVE_INTVL:
+        size = sizeof(int);
+        value = malloc(size);
+        rc = zmq_getsockopt(self->socket, type, value, &size);
+        retval = Number::New(*(int*)value);
+        break;
+      // bool
+      case ZMQ_RCVMORE:
+      case ZMQ_IPV4ONLY:
+      case ZMQ_DELAY_ATTACH_ON_CONNECT:
+        size = sizeof(bool);
+        value = malloc(size);
+        rc = zmq_getsockopt(self->socket, type, value, &size);
+        retval = Boolean::New(*(bool*)value);
+        break;
+      // uint64_t
+      case ZMQ_AFFINITY:
+        size = sizeof(uint64_t);
+        value = malloc(size);
+        rc = zmq_getsockopt(self->socket, type, value, &size);
+        retval = Number::New(*(uint64_t*)value);
+        break;
+      // int64_t
+      case ZMQ_MAXMSGSIZE:
+        size = sizeof(int64_t);
+        value = malloc(size);
+        rc = zmq_getsockopt(self->socket, type, value, &size);
+        retval = Number::New(*(int64_t*)value);
+        break;
+    }
+
+    if (value != NULL) {
+      free(value);
+    }
+
+    ZMQ_CHECK(rc);
+
+    return scope.Close(retval);
   }
 
   //
@@ -189,6 +384,7 @@ namespace zmqstream {
   Handle<Value> Socket::Read(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
 
     if (self->socket == NULL) {
       THROW_REF("Socket is closed, and cannot be read from.");
@@ -258,6 +454,7 @@ namespace zmqstream {
   Handle<Value> Socket::Write(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
 
     if (self->socket == NULL) {
       THROW_REF("Socket is closed, and cannot be written to.");
@@ -303,6 +500,7 @@ namespace zmqstream {
   Handle<Value> Socket::Connect(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
 
     if (self->socket == NULL) {
       THROW_REF("Socket is closed, and cannot be connected.");
@@ -329,6 +527,7 @@ namespace zmqstream {
   Handle<Value> Socket::Disconnect(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
 
     if (self->socket == NULL) {
       THROW_REF("Socket is closed, and cannot be disconnected.");
@@ -355,6 +554,7 @@ namespace zmqstream {
   Handle<Value> Socket::Bind(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
 
     if (self->socket == NULL) {
       THROW_REF("Socket is closed, and cannot be bound.");
@@ -381,6 +581,7 @@ namespace zmqstream {
   Handle<Value> Socket::Unbind(const Arguments& args) {
     HandleScope scope;
     Socket *self = THIS_TO_SOCKET(args.This());
+    assert(self);
 
     if (self->socket == NULL) {
       THROW_REF("Socket is closed, and cannot be unbound.");
@@ -407,6 +608,7 @@ namespace zmqstream {
     assert(handle);
 
     Socket* self = (Socket*)handle->data;
+    assert(self);
     assert(self->socket);
 
     Handle<Value> jsObj = SOCKET_TO_THIS(self);
@@ -469,6 +671,8 @@ namespace zmqstream {
     NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "read", Read);
     NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "write", Write);
     NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "close", Close);
+    NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "set", SetOption);
+    NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "get", GetOption);
     NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "connect", Connect);
     NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "disconnect", Disconnect);
     NODE_SET_PROTOTYPE_METHOD(constructorTemplate, "bind", Bind);
@@ -499,8 +703,19 @@ namespace zmqstream {
     ZMQ_DEFINE_CONSTANT(Type, "PUSH", ZMQ_PUSH);
     ZMQ_DEFINE_CONSTANT(Type, "PULL", ZMQ_PULL);
     ZMQ_DEFINE_CONSTANT(Type, "PAIR", ZMQ_PAIR);
-
     target->Set(String::NewSymbol("Type"), Type, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete));
+
+    // TODO: While SetOption and GetOption technically support any ZMQ_* option, we only want to export those constants
+    // that make sense. For example, there's currently no way to set `io_threads`, so setting AFFINITY doesn't matter.
+    // However, setting IDENTITY, SUBSCRIBE, and UNSUBSCRIBE are _required_ in a lot of applications.
+    Local<Object> Option = Object::New();
+    ZMQ_DEFINE_CONSTANT(Option, "TYPE", ZMQ_TYPE);
+    ZMQ_DEFINE_CONSTANT(Option, "IDENTITY", ZMQ_IDENTITY);
+    ZMQ_DEFINE_CONSTANT(Option, "SUBSCRIBE", ZMQ_SUBSCRIBE);
+    ZMQ_DEFINE_CONSTANT(Option, "UNSUBSCRIBE", ZMQ_UNSUBSCRIBE);
+    ZMQ_DEFINE_CONSTANT(Option, "LINGER", ZMQ_LINGER);
+    target->Set(String::NewSymbol("Option"), Option, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete));
+
     // This has to be last, otherwise the properties won't show up on the object in JavaScript.
     target->Set(String::NewSymbol("Socket"), constructor);
 
