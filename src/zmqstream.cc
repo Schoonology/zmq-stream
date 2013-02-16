@@ -146,9 +146,6 @@ namespace zmqstream {
     // Establish our libuv handle and callback.
     uv_idle_start(&obj->handle, Check);
 
-    // TODO
-    ZMQ_CHECK(zmq_setsockopt(obj->socket, ZMQ_IDENTITY, "TestClient", 10));
-
     return args.This();
   }
 
@@ -260,7 +257,6 @@ namespace zmqstream {
         break;
     }
 
-    // TODO: Support other option values.
     rc = zmq_setsockopt(self->socket, type, value, size);
 
     if (value != NULL) {
@@ -448,8 +444,6 @@ namespace zmqstream {
   //
   // NOTE: Unlike the builtin Duplex class, a return value of `false` indicates the write was _unsuccessful_, and
   // will need to be tried again.
-  //
-  // TODO: Investigate caching in JS and sending one event loop's worth every tick.
   //
   Handle<Value> Socket::Write(const Arguments& args) {
     HandleScope scope;
