@@ -91,7 +91,7 @@ namespace zmqstream {
     this->socket = zmq_socket(gContext.context, type);
     assert(this->socket != 0);
 
-    assert(uv_idle_init(uv_default_loop(), &handle) == 0);
+    assert(uv_timer_init(uv_default_loop(), &handle) == 0);
     handle.data = this;
   }
 
@@ -144,7 +144,7 @@ namespace zmqstream {
     }
 
     // Establish our libuv handle and callback.
-    uv_idle_start(&obj->handle, Check);
+    uv_timer_start(&obj->handle, Check, 10, 10);
 
     return args.This();
   }
@@ -161,7 +161,7 @@ namespace zmqstream {
 
     void *socket = self->socket;
 
-    uv_idle_stop(&self->handle);
+    uv_timer_stop(&self->handle);
 
     if (socket == NULL) {
       return scope.Close(Undefined());
@@ -598,7 +598,7 @@ namespace zmqstream {
   // To generate `'readable'` and `'drain'` events, we need to be polling our socket handles periodically. We
   // define that period to be once per event loop tick, and this is our libuv callback to handle that.
   //
-  void Socket::Check(uv_idle_t* handle, int status) {
+  void Socket::Check(uv_timer_t* handle, int status) {
     assert(handle);
 
     Socket* self = (Socket*)handle->data;

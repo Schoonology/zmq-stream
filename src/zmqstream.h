@@ -48,13 +48,13 @@ namespace zmqstream {
       // To generate `'readable'` and `'drain'` events, we need to be polling our socket handles periodically. We
       // define that period to be once per event loop tick, and this is our libuv callback to handle that.
       //
-      static void Check(uv_idle_t* handle, int status);
+      static void Check(uv_timer_t* handle, int status);
 
       virtual ~Socket();
 
     protected:
       void *socket;
-      uv_idle_t handle;
+      uv_timer_t handle;
 
       // We've fired the `'drain'` event, but have not called `write` yet.
       bool drain;
