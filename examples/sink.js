@@ -9,6 +9,7 @@ var zmqstream = require('../lib/zmqstream')
   , received = 0
 
 console.log('Sinking ' + count + ' messages with a ' + type + '(' + stream.type + ') socket.')
+console.log('PID:', process.pid)
 
 function done() {
   console.log('Received:', received)
@@ -43,7 +44,6 @@ stream.on('readable', function () {
   console.log('READABLE')
   recv()
 })
-
 recv()
 
 module.exports = zmqstream

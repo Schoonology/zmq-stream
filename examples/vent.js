@@ -1,6 +1,6 @@
 var zmqstream = require('../lib/zmqstream')
   , BROKER_URL = process.argv[4] || 'ipc:///tmp/zmqtestbr'
-  , start = Date.now()
+  , start = null
   , count = parseInt(process.argv[2], 10) || 1000
   , type = process.argv[3] || 'DEALER'
   , stream = new zmqstream.Socket({
@@ -9,6 +9,7 @@ var zmqstream = require('../lib/zmqstream')
   , sent = 0
 
 console.log('Venting ' + count + ' messages with a ' + type + '(' + stream.type + ') socket.')
+console.log('PID:', process.pid)
 
 function done() {
   console.log('Sent:', sent)
@@ -17,6 +18,10 @@ function done() {
 }
 
 function send() {
+  if (start == null) {
+    start = Date.now()
+  }
+
   if (sent === count) {
     done()
     return
