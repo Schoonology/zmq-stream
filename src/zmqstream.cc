@@ -202,9 +202,7 @@ namespace zmqstream {
     }
 
     int type = args[0]->Int32Value();
-    void *value = NULL;
-    size_t size = 0;
-    int rc;
+    int rc = 0;
 
     switch (type) {
       // char*
@@ -212,9 +210,15 @@ namespace zmqstream {
       case ZMQ_UNSUBSCRIBE:
       case ZMQ_IDENTITY:
       case ZMQ_TCP_ACCEPT_FILTER:
-        size = args[1]->ToString()->Length();
-        value = malloc(size);
-        args[1]->ToString()->WriteAscii((char*)value, 0, size);
+        {
+          size_t size = args[1]->ToString()->Length();
+          void *value = malloc(size);
+          args[1]->ToString()->WriteAscii((char*)value, 0, size);
+
+          rc = zmq_setsockopt(self->socket, type, value, size);
+
+          free(value);
+        }
         break;
       // int
       case ZMQ_RATE:
@@ -231,36 +235,39 @@ namespace zmqstream {
       case ZMQ_TCP_KEEPALIVE_IDLE:
       case ZMQ_TCP_KEEPALIVE_CNT:
       case ZMQ_TCP_KEEPALIVE_INTVL:
-        size = sizeof(int);
-        value = malloc(size);
-        ((int*)value)[0] = args[1]->Int32Value();
+        {
+          int value = args[1]->Int32Value();
+
+          rc = zmq_setsockopt(self->socket, type, &value, sizeof value);
+        }
+        break;
       // bool
       case ZMQ_IPV4ONLY:
       case ZMQ_DELAY_ATTACH_ON_CONNECT:
       case ZMQ_ROUTER_MANDATORY:
       case ZMQ_XPUB_VERBOSE:
-        size = sizeof(bool);
-        value = malloc(size);
-        ((bool*)value)[0] = args[1]->Int32Value() > 0 ? 1 : 0;
+        {
+          bool value = args[1]->Int32Value() > 0 ? 1 : 0;
+
+          rc = zmq_setsockopt(self->socket, type, &value, sizeof value);
+        }
         break;
       // uint64_t
       case ZMQ_AFFINITY:
-        size = sizeof(uint64_t);
-        value = malloc(size);
-        ((uint64_t*)value)[0] = args[1]->Uint32Value();
+        {
+          uint64_t value = args[1]->Uint32Value();
+
+          rc = zmq_setsockopt(self->socket, type, &value, sizeof value);
+        }
         break;
       // int64_t
       case ZMQ_MAXMSGSIZE:
-        size = sizeof(int64_t);
-        value = malloc(size);
-        ((int64_t*)value)[0] = args[1]->IntegerValue();
+        {
+          int64_t value = args[1]->IntegerValue();
+
+          rc = zmq_setsockopt(self->socket, type, &value, sizeof value);
+        }
         break;
-    }
-
-    rc = zmq_setsockopt(self->socket, type, value, size);
-
-    if (value != NULL) {
-      free(value);
     }
 
     ZMQ_CHECK(rc);
