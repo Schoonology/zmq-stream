@@ -1,17 +1,3 @@
-# ZMQStream
-
-A set of stream-based Node bindings for ZeroMQ. The API is modeled after the [streams2](http://blog.nodejs.org/2012/12/20/streams2/) API.
-
-## Differences from Streams2
-
-Since [ZeroMQ is Not a Neutral Carrier](http://zguide.zeromq.org/page:all#-MQ-is-Not-a-Neutral-Carrier), the streams2 Duplex API ZMQStream uses is by _message_, not by byte. While the Duplex API is carried over in spirit, _do not_ try to read and write as if they're bytestreams, nor should you `pipe` a bytestream into or out of a ZMQStream Socket.
-
-## Examples
-
-In lieu of more verbose API documentation, I'll refer you to the (far from perfect) examples (sink, vent, router, and dealer) in the `examples` directory.
-
-## License
-
 Copyright (C) 2013 Michael Schoonmaker (michael.r.schoonmaker@gmail.com)
 
 This project is free software released under the MIT/X11 license:
