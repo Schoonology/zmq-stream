@@ -1,5 +1,5 @@
 var zmqstream = require('../lib/zmqstream')
-  , BROKER_URL = process.argv[4] || 'ipc:///tmp/zmqtestbr'
+  , iface = process.argv[4] || 'ipc:///tmp/zmqtestbr'
   , start = null
   , count = parseInt(process.argv[2], 10) || 1000
   , type = process.argv[3] || 'DEALER'
@@ -37,7 +37,7 @@ function send() {
   }
 }
 
-stream.connect(BROKER_URL)
+stream.connect(iface)
 
 stream.on('drain', function () {
   console.log('DRAIN')

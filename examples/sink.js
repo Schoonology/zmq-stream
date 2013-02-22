@@ -1,5 +1,5 @@
 var zmqstream = require('../lib/zmqstream')
-  , BROKER_URL = process.argv[4] || 'ipc:///tmp/zmqtestbr'
+  , iface = process.argv[4] || 'ipc:///tmp/zmqtestbr'
   , start = null
   , count = parseInt(process.argv[2], 10) || 1000
   , type = process.argv[3] || 'ROUTER'
@@ -38,7 +38,7 @@ function recv() {
   }
 }
 
-stream.bind(BROKER_URL)
+stream.bind(iface)
 
 stream.on('readable', function () {
   console.log('READABLE')
