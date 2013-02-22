@@ -418,7 +418,7 @@ namespace zmqstream {
         // We want to continue, so clear `rc`.
         rc = 0;
 
-        message->Set(message->Length(), Buffer::New(String::New((char*)zmq_msg_data(&part), zmq_msg_size(&part))));
+        message->Set(message->Length(), Local<Object>::New(Buffer::New((char*)zmq_msg_data(&part), zmq_msg_size(&part))->handle_));
 
         if (!zmq_msg_more(&part)) {
           size--;
