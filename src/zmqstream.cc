@@ -127,6 +127,7 @@ namespace zmqstream {
 
     // Creates a new instance object of this type and wraps it.
     Socket* obj = new Socket(type->Value());
+    assert(obj);
     obj->Wrap(args.This());
 
     if (hwm > 0) {
@@ -213,6 +214,7 @@ namespace zmqstream {
         {
           size_t size = args[1]->ToString()->Length();
           void *value = malloc(size);
+          assert(value);
           args[1]->ToString()->WriteAscii((char*)value, 0, size);
 
           rc = zmq_setsockopt(self->socket, type, value, size);
@@ -295,18 +297,21 @@ namespace zmqstream {
 
     Handle<Value> retval;
     int type = args[0]->Int32Value();
-    void *value = NULL;
-    size_t size = 0;
+    size_t size;
     int rc;
 
     switch (type) {
       // char*
       case ZMQ_IDENTITY:
       case ZMQ_LAST_ENDPOINT:
-        size = 128;
-        value = malloc(size);
-        rc = zmq_getsockopt(self->socket, type, value, &size);
-        retval = String::New((char*)value, size);
+        {
+          size = 128;
+          void *value = malloc(size);
+          assert(value);
+          rc = zmq_getsockopt(self->socket, type, value, &size);
+          retval = String::New((char*)value, size);
+          free(value);
+        }
         break;
       // int
       case ZMQ_TYPE:
@@ -329,38 +334,42 @@ namespace zmqstream {
       case ZMQ_TCP_KEEPALIVE_IDLE:
       case ZMQ_TCP_KEEPALIVE_CNT:
       case ZMQ_TCP_KEEPALIVE_INTVL:
-        size = sizeof(int);
-        value = malloc(size);
-        rc = zmq_getsockopt(self->socket, type, value, &size);
-        retval = Number::New(*(int*)value);
+        {
+          size = sizeof(int);
+          int value;
+          rc = zmq_getsockopt(self->socket, type, &value, &size);
+          retval = Number::New(value);
+        }
         break;
       // bool
       case ZMQ_RCVMORE:
       case ZMQ_IPV4ONLY:
       case ZMQ_DELAY_ATTACH_ON_CONNECT:
-        size = sizeof(bool);
-        value = malloc(size);
-        rc = zmq_getsockopt(self->socket, type, value, &size);
-        retval = Boolean::New(*(bool*)value);
+        {
+          size = sizeof(bool);
+          bool value;
+          rc = zmq_getsockopt(self->socket, type, &value, &size);
+          retval = Boolean::New(value);
+        }
         break;
       // uint64_t
       case ZMQ_AFFINITY:
-        size = sizeof(uint64_t);
-        value = malloc(size);
-        rc = zmq_getsockopt(self->socket, type, value, &size);
-        retval = Number::New(*(uint64_t*)value);
+        {
+          size = sizeof(uint64_t);
+          uint64_t value;
+          rc = zmq_getsockopt(self->socket, type, &value, &size);
+          retval = Number::New(value);
+        }
         break;
       // int64_t
       case ZMQ_MAXMSGSIZE:
-        size = sizeof(int64_t);
-        value = malloc(size);
-        rc = zmq_getsockopt(self->socket, type, value, &size);
-        retval = Number::New(*(int64_t*)value);
+        {
+          size = sizeof(int64_t);
+          int64_t value;
+          rc = zmq_getsockopt(self->socket, type, &value, &size);
+          retval = Number::New(value);
+        }
         break;
-    }
-
-    if (value != NULL) {
-      free(value);
     }
 
     ZMQ_CHECK(rc);

@@ -292,6 +292,20 @@ describe('ZMQStream', function () {
       })
     })
 
+    describe('set/get', function () {
+      beforeEach(function () {
+        this.socket = new Socket()
+      })
+
+      it('should set and retrieve options', function () {
+        this.socket.set(zmqstream.Option.IDENTITY, '1234567890')
+        expect(this.socket.get(zmqstream.Option.IDENTITY)).to.equal('1234567890')
+
+        this.socket.set(zmqstream.Option.LINGER, 1234)
+        expect(this.socket.get(zmqstream.Option.LINGER)).to.equal(1234)
+      })
+    })
+
     describe('REQ-REP', function () {
       it('should be able to write messages without error')
       it('should be able to read messages without error')
