@@ -37,6 +37,8 @@ describe('ZMQStream', function () {
     it('should exist', function () {
       expect(zmqstream.Type).to.exist
       expect(zmqstream.Type).to.be.an('object')
+      expect(zmqstream.Option).to.exist
+      expect(zmqstream.Option).to.be.an('object')
     })
 
     it('should export all socket types', function () {
@@ -51,6 +53,15 @@ describe('ZMQStream', function () {
       expect(zmqstream.Type.PUSH, 'PUSH').to.exist
       expect(zmqstream.Type.PULL, 'PULL').to.exist
       expect(zmqstream.Type.PAIR, 'PAIR').to.exist
+    })
+
+    it('should export all available options', function () {
+      expect(zmqstream.Option.TYPE, 'TYPE').to.exist
+      expect(zmqstream.Option.IDENTITY, 'IDENTITY').to.exist
+      expect(zmqstream.Option.SUBSCRIBE, 'SUBSCRIBE').to.exist
+      expect(zmqstream.Option.UNSUBSCRIBE, 'UNSUBSCRIBE').to.exist
+      expect(zmqstream.Option.LINGER, 'LINGER').to.exist
+      // TODO: Support and test other options.
     })
   })
 
