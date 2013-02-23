@@ -1,6 +1,6 @@
 {
   "name": "zmq-stream",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "A set of stream-based Node bindings for ZeroMQ.",
   "main": "index.js",
   "dependencies": {
