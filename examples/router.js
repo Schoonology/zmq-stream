@@ -62,8 +62,8 @@ Router.prototype.stop = stop
 function stop() {
   var self = this
 
-  console.log('Sent:', self.sent)
   console.log('Received:', self.received)
+  console.log('Sent:', self.sent)
   self.stream.close()
 }
 
@@ -135,9 +135,13 @@ function send() {
       return
     }
 
-    process.nextTick(function () {
+    if (self.sent % 100 === 0) {
+      process.nextTick(function () {
+        self.send()
+      })
+    } else {
       self.send()
-    })
+    }
   }
 }
 

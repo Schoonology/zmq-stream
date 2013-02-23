@@ -69,6 +69,36 @@ function stop() {
 }
 
 //
+// ## send `send()`
+//
+// Recursively sends responses as fast as possible, up to one per event loop.
+//
+Dealer.prototype.send = send
+function send() {
+  var self = this
+
+  if (self.sent === self.count) {
+    return
+  }
+
+  var full = !self.stream.write([new Buffer(''), new Buffer('ping:' + self.sent)])
+
+  if (full) {
+    console.log('OUT EAGAIN:', self.sent)
+  } else {
+    self.sent++
+
+    if (self.sent % 100 === 0) {
+      process.nextTick(function () {
+        self.send()
+      })
+    } else {
+      self.send()
+    }
+  }
+}
+
+//
 // ## recv `recv()`
 //
 // Receives as many messages as possible, up to 100.
@@ -94,31 +124,6 @@ function recv() {
   process.nextTick(function () {
     self.recv()
   })
-}
-
-//
-// ## send `send()`
-//
-// Recursively sends responses as fast as possible, up to one per event loop.
-//
-Dealer.prototype.send = send
-function send() {
-  var self = this
-
-  if (self.sent === self.count) {
-    return
-  }
-
-  var full = !self.stream.write([new Buffer(''), new Buffer('ping')])
-
-  if (full) {
-    console.log('OUT EAGAIN:', self.sent)
-  } else {
-    self.sent++
-    process.nextTick(function () {
-      self.send()
-    })
-  }
 }
 
 module.exports = Dealer
