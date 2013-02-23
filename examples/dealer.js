@@ -1,71 +1,138 @@
+//
+// # Dealer
+//
+// TODO: Description.
+//
 var zmqstream = require('../lib/zmqstream')
-  , iface = process.argv[3] || 'ipc:///tmp/zmqtestbr'
-  // , start = null
-  // , duration = 0
-  , count = parseInt(process.argv[2], 10) || 1000
-  , stream = new zmqstream.Socket({
-      type: zmqstream.Type.DEALER
-    })
-  , sent = 0
-  , received = 0
 
-console.log('Pinging router with ' + count + ' messages.')
-console.log('PID:', process.pid)
+//
+// ## Dealer `Dealer(obj)`
+//
+// Creates a new instance of Dealer with the following options:
+//
+function Dealer(obj) {
+  if (!(this instanceof Dealer)) {
+    return new Dealer(obj)
+  }
 
-function done() {
-  console.log('Sent:', sent)
-  console.log('received:', received)
-  // console.log('Rate:', sent / (duration) * 1000)
-  stream.close()
+  obj = obj || {}
+
+  this.count = obj.count || 1000
+  this.iface = obj.iface || 'ipc:///tmp/zmqtestbr'
+  this.sent = 0
+  this.received = 0
+  this.queue = []
+
+  this.stream = new zmqstream.Socket({
+    type: zmqstream.Type.DEALER
+  })
+  this.stream.set(zmqstream.Option.IDENTITY, 'ExampleDealer')
 }
 
+//
+// ## start `start()`
+//
+// Starts the Dealer.
+//
+Dealer.prototype.start = start
+function start() {
+  var self = this
+
+  console.log('Pinging router with ' + self.count + ' messages.')
+  console.log('PID:', process.pid)
+
+  self.stream.connect(self.iface)
+
+  self.stream.on('drain', function () {
+    console.log('DRAIN')
+    self.send()
+  })
+  self.stream.on('readable', function () {
+    console.log('READABLE')
+    self.recv()
+  })
+  self.send()
+}
+
+//
+// ## stop `stop()`
+//
+// Stops the Dealer.
+//
+Dealer.prototype.stop = stop
+function stop() {
+  var self = this
+
+  console.log('Sent:', self.sent)
+  console.log('Received:', self.received)
+  self.stream.close()
+}
+
+//
+// ## recv `recv()`
+//
+// Receives as many messages as possible, up to 100.
+//
+Dealer.prototype.recv = recv
 function recv() {
-  var messages = stream.read(10)
+  var self = this
+    , messages = self.stream.read(100)
 
   if (!messages) {
-    console.log('IN EAGAIN:', received)
+    console.log('IN EAGAIN:', self.received)
     return
   }
 
   console.log('Got:', messages.length)
+  self.received += messages.length
 
-  received += messages.length
-
-  if (received >= count) {
-    done()
+  if (self.received >= self.count) {
+    self.stop()
     return
   }
 
-  process.nextTick(recv)
+  process.nextTick(function () {
+    self.recv()
+  })
 }
 
+//
+// ## send `send()`
+//
+// Recursively sends responses as fast as possible, up to one per event loop.
+//
+Dealer.prototype.send = send
 function send() {
-  if (sent === count) {
+  var self = this
+
+  if (self.sent === self.count) {
     return
   }
 
-  // if (start == null) {
-  //   start = Date.now()
-  // }
-
-  var full = !stream.write([new Buffer(''), new Buffer('ping')])
+  var full = !self.stream.write([new Buffer(''), new Buffer('ping')])
 
   if (full) {
-    console.log('OUT EAGAIN:', sent)
+    console.log('OUT EAGAIN:', self.sent)
   } else {
-    sent++
-    process.nextTick(send)
+    self.sent++
+    process.nextTick(function () {
+      self.send()
+    })
   }
 }
 
-stream.connect(iface)
+module.exports = Dealer
 
-stream.on('drain', function () {
-  console.log('DRAIN')
-  send()
-})
-stream.on('readable', function () {
-  console.log('READABLE')
-  recv()
-})
-send()
+//
+// ## Running
+//
+// If `dealer` is required directly, we want to start a new Dealer, actively receiving `argv.count` messages.
+//
+if (require.main === module) {
+  var dealer = new Dealer({
+    count: parseInt(process.argv[2], 10),
+    iface: process.argv[3]
+  })
+
+  dealer.start()
+}
