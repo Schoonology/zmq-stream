@@ -23,6 +23,10 @@ function Router(obj) {
   this.received = 0
   this.queue = []
 
+  if (this.count < 0) {
+    this.count = Infinity
+  }
+
   this.stream = new zmqstream.Socket({
     type: zmqstream.Type.ROUTER
   })
