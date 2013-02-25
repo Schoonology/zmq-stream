@@ -92,11 +92,7 @@ function recv() {
   }
 
   messages.forEach(function (envelope) {
-    // console.log(envelope.map(function (item) {
-    //   return item.toString('hex')
-    // }))
-
-    envelope[1] = new Buffer('pong')
+    envelope.push(new Buffer(envelope.pop().toString().replace('ping', 'pong')))
 
     self.queue.push(envelope)
   })
