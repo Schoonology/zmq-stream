@@ -126,13 +126,14 @@ namespace zmqstream {
     int32_t hwm = options->Get(String::NewSymbol("highWaterMark"))->ToInteger()->Int32Value();
 
     // Creates a new instance object of this type and wraps it.
-    Socket* obj = new Socket(type->Value());
-    assert(obj);
-    obj->Wrap(args.This());
+    Socket* self = new Socket(type->Value());
+    assert(self);
+    self->Wrap(args.This());
+    self->Ref();
 
     if (hwm > 0) {
-      ZMQ_CHECK(zmq_setsockopt(obj->socket, ZMQ_SNDHWM, &hwm, sizeof hwm));
-      ZMQ_CHECK(zmq_setsockopt(obj->socket, ZMQ_RCVHWM, &hwm, sizeof hwm));
+      ZMQ_CHECK(zmq_setsockopt(self->socket, ZMQ_SNDHWM, &hwm, sizeof hwm));
+      ZMQ_CHECK(zmq_setsockopt(self->socket, ZMQ_RCVHWM, &hwm, sizeof hwm));
     }
 
     // Establishes initial property values.
@@ -145,7 +146,7 @@ namespace zmqstream {
     }
 
     // Establish our libuv handle and callback.
-    uv_timer_start(&obj->handle, Check, 10, 10);
+    uv_timer_start(&self->handle, Check, 10, 10);
 
     return args.This();
   }
@@ -169,13 +170,9 @@ namespace zmqstream {
     }
 
     self->socket = NULL;
+    self->Unref();
 
     ZMQ_CHECK(zmq_close(socket));
-
-    // TODO: We could destroy the entire Socket with `delete`, but that would change the contract, making the object
-    // "near death", rather than accessible but invalid.
-    //
-    // delete self;
 
     return scope.Close(Undefined());
   }
@@ -622,6 +619,7 @@ namespace zmqstream {
   // define that period to be once per event loop tick, and this is our libuv callback to handle that.
   //
   void Socket::Check(uv_timer_t* handle, int status) {
+    HandleScope scope;
     assert(handle);
 
     Socket* self = (Socket*)handle->data;
@@ -629,6 +627,7 @@ namespace zmqstream {
     assert(self->socket);
 
     Handle<Value> jsObj = SOCKET_TO_THIS(self);
+    assert(!jsObj.IsEmpty());
     if (!jsObj->IsObject()) {
       return;
     }
