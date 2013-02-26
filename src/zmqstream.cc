@@ -734,6 +734,7 @@ namespace zmqstream {
 
     // This has to be last, otherwise the properties won't show up on the object in JavaScript.
     target->Set(String::NewSymbol("Socket"), constructor);
+    target->Set(String::NewSymbol("createSocket"), constructor);
 
     int major, minor, patch;
     char version[100];

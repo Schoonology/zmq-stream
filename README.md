@@ -129,7 +129,8 @@ Synchronously unbinds from **endpoint**, expressed as a String, throwing an Erro
 
 ## Alternatives & Comparisons
 
- * [zmq](http://npmjs.org/package/zmq) - `zmq` has a much "nicer" per-message `send` method, one frame per argument. In addition, all incoming messages are broadcast as a `"message"` event on the socket, also with one frame per argument. That said, `zmq` does not have special treatment for HMM/EAGAIN issues, and has a more limited throughput (on the machine used to develop zmq-stream, zmq-stream hit ~140k msg/s where zmq hit ~4k).
+ * [zmq](http://npmjs.org/package/zmq) - `zmq` has a much "nicer" per-message `send` method, one frame per argument. In addition, all incoming messages are broadcast as a `"message"` event on the socket, also with one frame per argument. That said, `zmq` does not have special treatment for HMM/EAGAIN issues, and has a more limited throughput.
+ * [axon](https://github.com/visionmedia/axon) - `axon` is _not_ a ZeroMQ wrapper. Rather, is a similar messaging library written _entirely_ in Javascript. It's API is almost identical to `zmq`, and I'd recommend it over `zmq` for most applications. It suffers the same limitations as `zmq`, but to a lesser extent.
 
 ## License
 
