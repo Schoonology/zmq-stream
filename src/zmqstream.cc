@@ -2,6 +2,8 @@
 #include <node_buffer.h>
 #include <zmq.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "zmqstream.h"
 
