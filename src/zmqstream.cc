@@ -297,7 +297,7 @@ namespace zmqstream {
     Handle<Value> retval;
     int type = args[0]->Int32Value();
     size_t size;
-    int rc;
+    int rc = 0;
 
     switch (type) {
       // char*
