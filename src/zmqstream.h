@@ -45,21 +45,44 @@ namespace zmqstream {
       //
       // ## Check
       //
-      // To generate `'readable'` and `'drain'` events, we need to be polling our socket handles periodically. We
-      // define that period to be once per event loop tick, and this is our libuv callback to handle that.
+      // A `uv_poll_cb` registered to facilitate generating `'readable'` and `'drain'` events.
       //
-      static void Check(uv_timer_t* handle, int status);
+      static void Check(uv_poll_t* handle, int status, int events);
+
+      //
+      // ## Check
+      //
+      // A `uv_idle_cb` registered to facilitate generating `'readable'` and `'drain'` events.
+      //
+      static void Check(uv_idle_t* handle, int status);
+
+      //
+      // ## Check
+      //
+      // The actual workhorse responsible for checking ZMQ_EVENTS, firing `'readable'` and `'drain'` as appropriate.
+      //
+      static void Check(Socket *self);
 
       virtual ~Socket();
 
     protected:
+      // The actual ZeroMQ socket instance.
       void *socket;
-      uv_timer_t handle;
 
-      // We've fired the `'drain'` event, but have not called `write` yet.
-      bool drain;
-      // We've fired the `'readable'` event, but have not called `read` yet.
-      bool readable;
+      // Since "after calling zmq_send the socket may become readable (and vice versa) without triggering a read event
+      // on the file descriptor", and that same file descriptor is signaled in an edge-triggered fashion by ZeroMQ, we
+      // need a combination of approaches to integrate it with Libuv:
+      //
+      // A pair of uv_poll handles are responsible for picking up on readability/writability tests out of band with send
+      // and recv calls.
+      uv_poll_t readableHandle;
+      uv_poll_t writableHandle;
+      // A uv_idle handle is responsible for queueing Check calls to be called "soon".
+      uv_idle_t idleHandle;
+      // A flag that is true when the application should expect a "drain" event.
+      bool shouldDrain;
+      // A flag that is true when the application should expect a "readable" event.
+      bool shouldReadable;
 
       Socket(int type);
 
@@ -97,8 +120,8 @@ namespace zmqstream {
       // Consumes a maximum of **size** messages of data from the ZMQ socket. If **size** is undefined, the entire
       // queue will be read and returned.
       //
-      // If there is no data to consume, or if there are fewer bytes in the internal buffer than the size argument,
-      // then null is returned, and a future 'readable' event will be emitted when more is available.
+      // If there is no data to consume then null is returned, and a future 'readable' event will be emitted when more is
+      // available.
       //
       // Calling stream.read(0) is a no-op with no internal side effects, but can be used to test for Socket validity.
       //

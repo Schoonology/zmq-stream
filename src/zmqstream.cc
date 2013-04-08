@@ -89,12 +89,20 @@ namespace zmqstream {
   // Much like the native `net` module, a ZMQStream socket (perhaps obviously) is really just a Duplex stream that
   // you can `connect`, `bind`, etc. just like a native ZMQ socket.
   //
-  Socket::Socket(int type) : ObjectWrap(), drain(true), readable(false) {
+  Socket::Socket(int type) : ObjectWrap(), shouldDrain(false), shouldReadable(true) {
     this->socket = zmq_socket(gContext.context, type);
     assert(this->socket != 0);
 
-    assert(uv_timer_init(uv_default_loop(), &handle) == 0);
-    handle.data = this;
+    uv_os_sock_t fd;
+    size_t size = sizeof fd;
+    zmq_getsockopt(this->socket, ZMQ_FD, &fd, &size);
+
+    assert(uv_poll_init_socket(uv_default_loop(), &readableHandle, fd) == 0);
+    readableHandle.data = this;
+    assert(uv_poll_init_socket(uv_default_loop(), &writableHandle, fd) == 0);
+    writableHandle.data = this;
+    assert(uv_idle_init(uv_default_loop(), &idleHandle) == 0);
+    idleHandle.data = this;
   }
 
   Socket::~Socket() {
@@ -147,9 +155,6 @@ namespace zmqstream {
       super->ToObject()->CallAsFunction(args.This(), 0, NULL);
     }
 
-    // Establish our libuv handle and callback.
-    uv_timer_start(&self->handle, Check, 10, 10);
-
     return args.This();
   }
 
@@ -165,7 +170,9 @@ namespace zmqstream {
 
     void *socket = self->socket;
 
-    uv_timer_stop(&self->handle);
+    uv_poll_stop(&self->readableHandle);
+    uv_poll_stop(&self->writableHandle);
+    uv_idle_stop(&self->idleHandle);
 
     if (socket == NULL) {
       return scope.Close(Undefined());
@@ -382,8 +389,8 @@ namespace zmqstream {
   // Consumes a maximum of **size** messages of data from the ZMQ socket. If **size** is undefined, the entire
   // queue will be read and returned.
   //
-  // If there is no data to consume, or if there are fewer bytes in the internal buffer than the size argument,
-  // then null is returned, and a future 'readable' event will be emitted when more is available.
+  // If there is no data to consume then null is returned, and a future 'readable' event will be emitted when more is
+  // available.
   //
   // Calling stream.read(0) is a no-op with no internal side effects, but can be used to test for Socket validity.
   //
@@ -433,14 +440,17 @@ namespace zmqstream {
           messages->Set(messages->Length(), message);
           message = Array::New();
         }
-      } else {
-        self->readable = false;
       }
 
       ZMQ_CHECK(zmq_msg_close(&part));
     } while (rc == 0 && size != 0);
 
+    // We've just called recv, and are required to check ZMQ_EVENTS.
+    uv_idle_start(&self->idleHandle, Socket::Check);
+
     if (messages->Length() == 0) {
+      self->shouldReadable = true;
+      uv_poll_start(&self->readableHandle, UV_READABLE, Check);
       return scope.Close(Null());
     }
 
@@ -485,6 +495,9 @@ namespace zmqstream {
       }
     }
 
+    // We're about to call send, and are required to check ZMQ_EVENTS.
+    uv_idle_start(&self->idleHandle, Socket::Check);
+
     for (int i = 0; i < length; i++) {
       zmq_msg_t part;
 
@@ -498,7 +511,8 @@ namespace zmqstream {
       ZMQ_CHECK(rc);
 
       if (isEAGAIN(rc)) {
-        self->drain = false;
+        uv_poll_start(&self->writableHandle, UV_WRITABLE, Check);
+        self->shouldDrain = true;
         return scope.Close(Boolean::New(0));
       }
     }
@@ -617,15 +631,42 @@ namespace zmqstream {
   //
   // ## Check
   //
-  // To generate `'readable'` and `'drain'` events, we need to be polling our socket handles periodically. We
-  // define that period to be once per event loop tick, and this is our libuv callback to handle that.
+  // A `uv_poll_cb` registered to facilitate generating `'readable'` and `'drain'` events.
   //
-  void Socket::Check(uv_timer_t* handle, int status) {
-    HandleScope scope;
+  void Socket::Check(uv_poll_t* handle, int status, int events) {
     assert(handle);
+    assert(status == 0);
 
     Socket* self = (Socket*)handle->data;
     assert(self);
+
+    Socket::Check(self);
+  }
+
+  //
+  // ## Check
+  //
+  // A `uv_idle_cb` registered to facilitate generating `'readable'` and `'drain'` events.
+  //
+  void Socket::Check(uv_idle_t* handle, int status) {
+    assert(handle);
+
+    uv_idle_stop(handle);
+
+    Socket* self = (Socket*)handle->data;
+    assert(self);
+
+    Socket::Check(self);
+  }
+
+  //
+  // ## Check
+  //
+  // The actual workhorse responsible for checking ZMQ_EVENTS, firing `'readable'` and `'drain'` as appropriate.
+  //
+  void Socket::Check(Socket *self) {
+    HandleScope scope;
+
     assert(self->socket);
 
     Handle<Value> jsObj = SOCKET_TO_THIS(self);
@@ -640,36 +681,26 @@ namespace zmqstream {
       return;
     }
 
-    if (!self->readable) {
-      zmq_pollitem_t item;
+    int zmqEvents = 0;
+    size_t size = sizeof zmqEvents;
 
-      item.socket = self->socket;
-      item.events = ZMQ_POLLIN;
-
-      int rc = zmq_poll(&item, 1, 0);
-      assert(rc != -1);
-
-      if (rc > 0) {
-        self->readable = true;
-        Handle<Value> args[1] = { String::New("readable") };
-        emit->ToObject()->CallAsFunction(jsObj->ToObject(), 1, args);
-      }
+    if (zmq_getsockopt(self->socket, ZMQ_EVENTS, &zmqEvents, &size) < 0) {
+      printf("Problem checking actual socket state.\n");
+      return;
     }
 
-    if (!self->drain) {
-      zmq_pollitem_t item;
+    if (self->shouldReadable && (zmqEvents & ZMQ_POLLIN)) {
+      self->shouldReadable = false;
+      uv_poll_stop(&self->readableHandle);
+      Handle<Value> args[1] = { String::New("readable") };
+      emit->ToObject()->CallAsFunction(jsObj->ToObject(), 1, args);
+    }
 
-      item.socket = self->socket;
-      item.events = ZMQ_POLLOUT;
-
-      int rc = zmq_poll(&item, 1, 0);
-      assert(rc != -1);
-
-      if (rc > 0) {
-        self->drain = true;
-        Handle<Value> args[1] = { String::New("drain") };
-        emit->ToObject()->CallAsFunction(jsObj->ToObject(), 1, args);
-      }
+    if (self->shouldDrain && (zmqEvents & ZMQ_POLLOUT)) {
+      self->shouldDrain = false;
+      uv_poll_stop(&self->writableHandle);
+      Handle<Value> args[1] = { String::New("drain") };
+      emit->ToObject()->CallAsFunction(jsObj->ToObject(), 1, args);
     }
   }
 
