@@ -109,6 +109,10 @@ namespace zmqstream {
     if (this->socket) {
       assert(zmq_close(this->socket) == 0);
     }
+
+    uv_close((uv_handle_t*)&writableHandle, NULL);
+    uv_close((uv_handle_t*)&readableHandle, NULL);
+    uv_close((uv_handle_t*)&idleHandle, NULL);
   }
 
   //
